@@ -1,3 +1,3 @@
 # Visual Computing Workshops
 
-Repositorio para los talleres grupales de la materia Computación Visual 2026-I.
+Repositorio para los talleres grupales de la materia Computación Visual 2026-I (Grupo 7).
