@@ -1,0 +1,451 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Rasterización desde Cero — Computación Visual</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { background: #0a0a12; }
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: #0a0a12; }
+    ::-webkit-scrollbar-thumb { background: #2a2a3a; border-radius: 3px; }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect, useRef } = React;
+
+    const WIDTH = 80;
+    const HEIGHT = 80;
+    const PIXEL_SIZE = 7;
+
+    function createGrid() {
+      return Array(HEIGHT).fill(null).map(() => Array(WIDTH).fill(null));
+    }
+
+    // ─── Algoritmo de Bresenham ───────────────────────────────────────────────
+    // Genera la lista ordenada de píxeles que forman la línea entre (x0,y0) y (x1,y1)
+    // Solo aritmética entera: sumas, restas y comparaciones.
+    function bresenhamPixels(x0, y0, x1, y1) {
+      const pixels = [];
+      let dx = Math.abs(x1 - x0);
+      let dy = Math.abs(y1 - y0);
+      let sx = x0 < x1 ? 1 : -1;   // dirección en X
+      let sy = y0 < y1 ? 1 : -1;   // dirección en Y
+      let err = dx - dy;            // error inicial
+
+      while (true) {
+        pixels.push([x0, y0]);
+        if (x0 === x1 && y0 === y1) break;
+        let e2 = 2 * err;
+        if (e2 > -dy) { err -= dy; x0 += sx; }
+        if (e2 < dx)  { err += dx; y0 += sy; }
+      }
+      return pixels;
+    }
+
+    // ─── Algoritmo de Punto Medio (círculo) ──────────────────────────────────
+    // Calcula un octante y replica por simetría de 8 vías.
+    // Parámetro de decisión p actualizado incrementalmente.
+    function midpointCirclePixels(cx, cy, r) {
+      const pixels = [];
+      let x = r, y = 0, p = 1 - r;
+
+      while (x >= y) {
+        // 8 puntos simétricos del octante actual
+        for (const [dx, dy] of [
+          [ x,  y], [ y,  x],
+          [-x,  y], [-y,  x],
+          [-x, -y], [-y, -x],
+          [ x, -y], [ y, -x]
+        ]) {
+          const px = cx + dx, py = cy + dy;
+          if (px >= 0 && px < WIDTH && py >= 0 && py < HEIGHT)
+            pixels.push([px, py]);
+        }
+        y++;
+        if (p <= 0) {
+          p += 2 * y + 1;          // punto medio dentro del círculo
+        } else {
+          x--;
+          p += 2 * y - 2 * x + 1; // punto medio fuera del círculo
+        }
+      }
+      return pixels;
+    }
+
+    // ─── Rasterización Scanline (triángulo) ──────────────────────────────────
+    // Ordena vértices por Y, interpola bordes, rellena fila por fila.
+    function fillTrianglePixels(p1, p2, p3) {
+      const pixels = [];
+      const pts = [p1, p2, p3].sort((a, b) => a[1] - b[1]);
+      const [x1, y1] = pts[0];
+      const [x2, y2] = pts[1];
+      const [x3, y3] = pts[2];
+
+      // Interpolación lineal de X a lo largo de un borde
+      function interpolate(ya, yb, xa, xb) {
+        if (yb - ya === 0) return [];
+        return Array.from(
+          { length: yb - ya },
+          (_, i) => Math.round(xa + (xb - xa) * i / (yb - ya))
+        );
+      }
+
+      const x12   = interpolate(y1, y2, x1, x2); // borde superior
+      const x23   = interpolate(y2, y3, x2, x3); // borde inferior
+      const x13   = interpolate(y1, y3, x1, x3); // borde largo
+      const xLeft = [...x12, ...x23];             // un lado completo
+
+      for (let i = 0; i < xLeft.length && i < x13.length; i++) {
+        const y  = y1 + i;
+        const xl = Math.min(xLeft[i], x13[i]);
+        const xr = Math.max(xLeft[i], x13[i]);
+        for (let x = xl; x <= xr; x++) {
+          if (x >= 0 && x < WIDTH && y >= 0 && y < HEIGHT)
+            pixels.push([x, y]);
+        }
+      }
+      return pixels;
+    }
+
+    // ─── Definición de algoritmos ─────────────────────────────────────────────
+    const ALGORITHMS = {
+      bresenham: {
+        label: "Bresenham — Línea",
+        color: "#ff4d6d",
+        description: "Traza líneas usando solo aritmética entera. La variable de error acumulado decide si el siguiente píxel avanza en Y.",
+        complexity: "O(max(dx,dy))",
+        inventor: "Jack Bresenham, 1962",
+        generate: () => bresenhamPixels(8, 8, 70, 50),
+      },
+      circle: {
+        label: "Punto Medio — Círculo",
+        color: "#4dc3ff",
+        description: "Dibuja círculos aprovechando simetría de 8 vías. Solo calcula 1/8 del círculo y refleja el resto.",
+        complexity: "O(r)",
+        inventor: "Pitteway, 1967 · Van Aken, 1984",
+        generate: () => midpointCirclePixels(40, 40, 28),
+      },
+      triangle: {
+        label: "Scanline — Triángulo",
+        color: "#7bff6a",
+        description: "Rellena triángulos escaneando fila por fila. Interpolación lineal de los bordes izquierdo y derecho.",
+        complexity: "O(base × altura)",
+        inventor: "Base del rasterizador de GPU",
+        generate: () => fillTrianglePixels([15, 10], [65, 65], [25, 65]),
+      },
+    };
+
+    // ─── Componente principal ─────────────────────────────────────────────────
+    function Rasterizer() {
+      const [activeAlgo, setActiveAlgo] = useState("bresenham");
+      const [grid, setGrid]             = useState(createGrid);
+      const [animating, setAnimating]   = useState(false);
+      const [progress, setProgress]     = useState(0);
+      const frameRef = useRef(null);
+      const algo = ALGORITHMS[activeAlgo];
+
+      // Lanza la animación para el algoritmo con clave `key`
+      const runAnimation = (key) => {
+        if (frameRef.current) cancelAnimationFrame(frameRef.current);
+        setAnimating(true);
+        setProgress(0);
+
+        const pixels  = ALGORITHMS[key].generate();
+        const color   = ALGORITHMS[key].color;
+        const newGrid = createGrid();
+        let i = 0;
+
+        // Velocidad adaptativa: la animación siempre dura ~2 s
+        const speed = Math.max(1, Math.floor(pixels.length / 120));
+
+        function step() {
+          const end = Math.min(i + speed, pixels.length);
+          for (let j = i; j < end; j++) {
+            const [x, y] = pixels[j];
+            newGrid[y][x] = color;
+          }
+          i = end;
+          setGrid(newGrid.map(r => [...r]));
+          setProgress(Math.round((i / pixels.length) * 100));
+          if (i < pixels.length) {
+            frameRef.current = requestAnimationFrame(step);
+          } else {
+            setAnimating(false);
+          }
+        }
+        frameRef.current = requestAnimationFrame(step);
+      };
+
+      // Arrancar animación al cambiar de algoritmo y limpiar al desmontar
+      useEffect(() => {
+        runAnimation(activeAlgo);
+        return () => { if (frameRef.current) cancelAnimationFrame(frameRef.current); };
+      }, [activeAlgo]);
+
+      const pixelCount = ALGORITHMS[activeAlgo].generate().length;
+      const density    = ((pixelCount / (WIDTH * HEIGHT)) * 100).toFixed(1);
+
+      // ── Estilos inline reutilizables ────────────────────────────────────────
+      const card = {
+        background: "#0e0e1a",
+        borderRadius: "6px",
+        padding: "16px",
+      };
+      const label = {
+        fontSize: "10px",
+        color: "#555",
+        letterSpacing: "3px",
+        marginBottom: "8px",
+        display: "block",
+      };
+      const row = {
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "center",
+      };
+
+      return (
+        <div style={{
+          minHeight: "100vh",
+          background: "#0a0a12",
+          fontFamily: "'Courier New', monospace",
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          padding: "24px 16px",
+          gap: "20px",
+          color: "#e0e0e0",
+        }}>
+
+          {/* ── Encabezado ── */}
+          <div style={{ textAlign: "center" }}>
+            <div style={{ fontSize: "10px", letterSpacing: "6px", color: "#555", marginBottom: "6px", textTransform: "uppercase" }}>
+              Computación Visual
+            </div>
+            <h1 style={{ margin: 0, fontSize: "22px", fontWeight: 700, color: "#fff", letterSpacing: "1px" }}>
+              Rasterización desde Cero
+            </h1>
+            <div style={{ fontSize: "11px", color: "#444", marginTop: "4px" }}>
+              Algoritmos Clásicos · Visualización Interactiva
+            </div>
+          </div>
+
+          {/* ── Selector de algoritmo ── */}
+          <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", justifyContent: "center" }}>
+            {Object.entries(ALGORITHMS).map(([key, a]) => (
+              <button
+                key={key}
+                onClick={() => !animating && setActiveAlgo(key)}
+                style={{
+                  padding: "8px 16px",
+                  borderRadius: "4px",
+                  border: "1px solid",
+                  borderColor: activeAlgo === key ? a.color : "#2a2a3a",
+                  background: activeAlgo === key ? a.color + "22" : "transparent",
+                  color: activeAlgo === key ? a.color : "#555",
+                  fontSize: "11px",
+                  cursor: animating ? "not-allowed" : "pointer",
+                  letterSpacing: "1px",
+                  fontFamily: "inherit",
+                  transition: "all 0.2s",
+                  opacity: animating && activeAlgo !== key ? 0.4 : 1,
+                }}
+              >
+                {a.label}
+              </button>
+            ))}
+          </div>
+
+          {/* ── Área principal: canvas + panel ── */}
+          <div style={{
+            display: "flex",
+            gap: "24px",
+            flexWrap: "wrap",
+            justifyContent: "center",
+            alignItems: "flex-start",
+          }}>
+
+            {/* Canvas SVG */}
+            <div style={{
+              border: `1px solid ${algo.color}33`,
+              borderRadius: "6px",
+              overflow: "hidden",
+              boxShadow: `0 0 30px ${algo.color}18`,
+              background: "#06060f",
+              flexShrink: 0,
+            }}>
+              <svg
+                width={WIDTH * PIXEL_SIZE}
+                height={HEIGHT * PIXEL_SIZE}
+              >
+                {/* Líneas de grilla verticales */}
+                {Array.from({ length: WIDTH + 1 }, (_, i) => (
+                  <line key={`v${i}`}
+                    x1={i * PIXEL_SIZE} y1={0}
+                    x2={i * PIXEL_SIZE} y2={HEIGHT * PIXEL_SIZE}
+                    stroke="#111" strokeWidth="0.5"
+                  />
+                ))}
+                {/* Líneas de grilla horizontales */}
+                {Array.from({ length: HEIGHT + 1 }, (_, i) => (
+                  <line key={`h${i}`}
+                    x1={0}               y1={i * PIXEL_SIZE}
+                    x2={WIDTH * PIXEL_SIZE} y2={i * PIXEL_SIZE}
+                    stroke="#111" strokeWidth="0.5"
+                  />
+                ))}
+                {/* Píxeles activos */}
+                {grid.flatMap((row, y) =>
+                  row.map((color, x) =>
+                    color ? (
+                      <rect
+                        key={`${x}-${y}`}
+                        x={x * PIXEL_SIZE + 0.5}
+                        y={y * PIXEL_SIZE + 0.5}
+                        width={PIXEL_SIZE - 1}
+                        height={PIXEL_SIZE - 1}
+                        fill={color}
+                        style={{ filter: `drop-shadow(0 0 2px ${color})` }}
+                      />
+                    ) : null
+                  )
+                )}
+              </svg>
+            </div>
+
+            {/* Panel de información */}
+            <div style={{ width: "240px", display: "flex", flexDirection: "column", gap: "12px" }}>
+
+              {/* Info del algoritmo */}
+              <div style={{ ...card, border: `1px solid ${algo.color}44` }}>
+                <span style={label}>ALGORITMO</span>
+                <div style={{ fontSize: "14px", color: algo.color, fontWeight: 700, marginBottom: "8px" }}>
+                  {algo.label}
+                </div>
+                <div style={{ fontSize: "11px", color: "#888", lineHeight: "1.65", marginBottom: "14px" }}>
+                  {algo.description}
+                </div>
+                <div style={{ display: "flex", flexDirection: "column", gap: "7px" }}>
+                  <div style={row}>
+                    <span style={{ fontSize: "10px", color: "#444" }}>COMPLEJIDAD</span>
+                    <span style={{ fontSize: "10px", color: "#ccc" }}>{algo.complexity}</span>
+                  </div>
+                  <div style={row}>
+                    <span style={{ fontSize: "10px", color: "#444" }}>ORIGEN</span>
+                    <span style={{ fontSize: "10px", color: "#ccc", textAlign: "right", maxWidth: "130px", lineHeight: "1.4" }}>
+                      {algo.inventor}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Barra de progreso */}
+              <div style={{ ...card, border: "1px solid #1a1a2a" }}>
+                <span style={label}>PROGRESO</span>
+                <div style={{ background: "#1a1a2a", borderRadius: "2px", height: "4px", marginBottom: "10px", overflow: "hidden" }}>
+                  <div style={{
+                    height: "100%",
+                    width: `${progress}%`,
+                    background: `linear-gradient(90deg, ${algo.color}88, ${algo.color})`,
+                    transition: "width 0.08s linear",
+                    borderRadius: "2px",
+                  }} />
+                </div>
+                <div style={{ ...row }}>
+                  <span style={{ fontSize: "11px", color: "#555" }}>{progress}% completado</span>
+                  <span style={{ fontSize: "11px", color: algo.color }}>
+                    {Math.round(pixelCount * progress / 100)}/{pixelCount} px
+                  </span>
+                </div>
+              </div>
+
+              {/* Estadísticas del canvas */}
+              <div style={{ ...card, border: "1px solid #1a1a2a" }}>
+                <span style={label}>CANVAS</span>
+                <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                  {[
+                    ["RESOLUCIÓN",    `${WIDTH} × ${HEIGHT} px`],
+                    ["TOTAL PÍXELES", `${WIDTH * HEIGHT}`],
+                    ["PÍXELES ACTIVOS", pixelCount],
+                    ["DENSIDAD",      `${density}%`],
+                  ].map(([k, v]) => (
+                    <div key={k} style={row}>
+                      <span style={{ fontSize: "10px", color: "#444" }}>{k}</span>
+                      <span style={{ fontSize: "10px", color: "#bbb" }}>{v}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Botón reiniciar */}
+              <button
+                onClick={() => !animating && runAnimation(activeAlgo)}
+                style={{
+                  padding: "10px",
+                  borderRadius: "4px",
+                  border: `1px solid ${algo.color}${animating ? "22" : "66"}`,
+                  background: animating ? "#0e0e1a" : `${algo.color}11`,
+                  color: animating ? "#333" : algo.color,
+                  fontSize: "11px",
+                  cursor: animating ? "not-allowed" : "pointer",
+                  letterSpacing: "2px",
+                  fontFamily: "inherit",
+                  width: "100%",
+                  transition: "all 0.2s",
+                }}
+              >
+                {animating ? "⬛ ANIMANDO..." : "▶ REINICIAR"}
+              </button>
+            </div>
+          </div>
+
+          {/* ── Píldoras teóricas ── */}
+          <div style={{
+            display: "flex",
+            gap: "8px",
+            flexWrap: "wrap",
+            justifyContent: "center",
+            maxWidth: "640px",
+          }}>
+            {[
+              "Solo aritmética entera",
+              "Sin punto flotante",
+              "Base del pipeline GPU",
+              "O(n) por longitud",
+              "Simetría de 8 vías (círculo)",
+              "Scanline (triángulo)",
+            ].map(t => (
+              <div key={t} style={{
+                fontSize: "10px",
+                color: "#555",
+                background: "#0e0e1a",
+                border: "1px solid #1a1a28",
+                borderRadius: "3px",
+                padding: "4px 10px",
+                letterSpacing: "0.5px",
+              }}>
+                {t}
+              </div>
+            ))}
+          </div>
+
+          {/* Pie de página */}
+          <div style={{ fontSize: "10px", color: "#2a2a3a", letterSpacing: "2px", paddingBottom: "8px" }}>
+            COMPUTACIÓN VISUAL · SEMANA 3 · RASTERIZACIÓN BÁSICA
+          </div>
+        </div>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById("root")).render(<Rasterizer />);
+  </script>
+</body>
+</html>
