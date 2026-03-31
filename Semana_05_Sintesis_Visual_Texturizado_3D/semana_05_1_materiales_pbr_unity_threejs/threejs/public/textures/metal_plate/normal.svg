@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <defs>
+    <linearGradient id="normalTint" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#7f8fff"/>
+      <stop offset="100%" stop-color="#8f7fff"/>
+    </linearGradient>
+    <pattern id="normalNoise" width="32" height="32" patternUnits="userSpaceOnUse">
+      <rect width="16" height="16" fill="#7f7fff"/>
+      <rect x="16" y="16" width="16" height="16" fill="#7f7fff"/>
+      <rect x="16" width="16" height="16" fill="#8088ff"/>
+      <rect y="16" width="16" height="16" fill="#7880ff"/>
+    </pattern>
+  </defs>
+  <rect width="512" height="512" fill="url(#normalTint)"/>
+  <rect width="512" height="512" fill="url(#normalNoise)" opacity="0.55"/>
+</svg>
