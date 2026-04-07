@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Three.js — materiales y temperatura de color</title>
+  <style>
+    body { margin: 0; overflow: hidden; font-family: system-ui, sans-serif; }
+    #ui {
+      position: absolute; left: 12px; top: 12px; z-index: 1;
+      background: rgba(0,0,0,0.65); color: #eee; padding: 12px 16px;
+      border-radius: 8px; max-width: 320px;
+    }
+    #ui label { display: block; margin-top: 8px; font-size: 13px; }
+    #ui input[type="range"] { width: 100%; }
+    #ui p { margin: 0 0 8px; font-size: 14px; }
+    #ui button {
+      margin-top: 10px; margin-right: 6px; padding: 8px 10px;
+      font-size: 12px; cursor: pointer; border-radius: 6px;
+      border: 1px solid #666; background: #333; color: #eee;
+    }
+    #ui button:hover { background: #444; }
+    #ui small { display: block; margin-top: 8px; line-height: 1.35; opacity: 0.9; }
+  </style>
+</head>
+<body>
+  <div id="ui">
+    <p><strong>Taller color</strong> — cubo / esfera (Three.js + WebGL).</p>
+    <label>Temperatura (frío ← → cálido): <span id="tempVal">0</span></label>
+    <input type="range" id="temp" min="-1" max="1" step="0.02" value="0" />
+    <label>Modo: <span id="modeVal">rgb</span></label>
+    <input type="range" id="mode" min="0" max="3" step="1" value="0" />
+    <small>0=RGB base, 1=invertido, 2=escala grises, 3=acento verde</small>
+    <button type="button" id="btnCapture">Descargar captura actual (PNG)</button>
+    <button type="button" id="btnEvidence">Exportar 2 evidencias (PNG)</button>
+    <small>“Exportar 2 evidencias” guarda renders WebGL: temperatura fría y cálida. Mueve los archivos a la carpeta <code>media/</code> del taller para el README.</small>
+  </div>
+  <script type="importmap">
+    { "imports": { "three": "https://unpkg.com/three@0.160.0/build/three.module.js" } }
+  </script>
+  <script type="module">
+    import * as THREE from "three";
+
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x1a1a22);
+
+    const camera = new THREE.PerspectiveCamera(50, innerWidth / innerHeight, 0.1, 100);
+    camera.position.set(0, 1.6, 4.5);
+
+    const renderer = new THREE.WebGLRenderer({
+      antialias: true,
+      preserveDrawingBuffer: true,
+    });
+    renderer.setSize(innerWidth, innerHeight);
+    renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+    document.body.appendChild(renderer.domElement);
+
+    const hemi = new THREE.HemisphereLight(0xffffff, 0x444466, 0.9);
+    scene.add(hemi);
+    const dir = new THREE.DirectionalLight(0xffffff, 0.5);
+    dir.position.set(2, 4, 3);
+    scene.add(dir);
+
+    const ground = new THREE.Mesh(
+      new THREE.PlaneGeometry(20, 20),
+      new THREE.MeshStandardMaterial({ color: 0x333340, roughness: 1, metalness: 0 })
+    );
+    ground.rotation.x = -Math.PI / 2;
+    scene.add(ground);
+
+    const cubeMat = new THREE.MeshStandardMaterial({ color: 0xe74c3c, roughness: 0.35, metalness: 0.2 });
+    const cube = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), cubeMat);
+    cube.position.set(-0.9, 0.5, 0);
+    scene.add(cube);
+
+    const sphereMat = new THREE.MeshStandardMaterial({ color: 0x3498db, roughness: 0.25, metalness: 0.35 });
+    const sphere = new THREE.Mesh(new THREE.SphereGeometry(0.65, 48, 32), sphereMat);
+    sphere.position.set(0.95, 0.65, 0);
+    scene.add(sphere);
+
+    function kelvinMix(t) {
+      const cold = new THREE.Color(0x88aaff);
+      const warm = new THREE.Color(0xffcc88);
+      return new THREE.Color().lerpColors(cold, warm, (t + 1) * 0.5);
+    }
+
+    const baseCube = new THREE.Color(0xe74c3c);
+    const baseSphere = new THREE.Color(0x3498db);
+
+    function applyMode(mode, tempShift) {
+      const ambTint = kelvinMix(tempShift);
+      hemi.color.copy(ambTint);
+
+      const t = (tempShift + 1) * 0.5;
+      const cubeC = baseCube.clone().lerp(new THREE.Color(0xffffff), t * 0.15);
+      const sphC = baseSphere.clone().lerp(new THREE.Color(0xffffff), (1 - t) * 0.1);
+
+      if (mode === 0) {
+        cubeMat.color.copy(cubeC);
+        sphereMat.color.copy(sphC);
+        cubeMat.emissive.setHex(0);
+        sphereMat.emissive.setHex(0);
+      } else if (mode === 1) {
+        cubeMat.color.setRGB(1 - cubeC.r, 1 - cubeC.g, 1 - cubeC.b);
+        sphereMat.color.setRGB(1 - sphC.r, 1 - sphC.g, 1 - sphC.b);
+      } else if (mode === 2) {
+        const lum = (r, g, b) => 0.299 * r + 0.587 * g + 0.114 * b;
+        const v = lum(cubeC.r, cubeC.g, cubeC.b);
+        cubeMat.color.setRGB(v, v, v);
+        const w = lum(sphC.r, sphC.g, sphC.b);
+        sphereMat.color.setRGB(w, w, w);
+      } else {
+        cubeMat.color.setRGB(cubeC.r * 0.6, cubeC.g * 1.1, cubeC.b * 0.5);
+        sphereMat.color.setRGB(sphC.r * 0.4, sphC.g * 1.2, sphC.b * 0.5);
+      }
+    }
+
+    const tempEl = document.getElementById("temp");
+    const modeEl = document.getElementById("mode");
+    const tempVal = document.getElementById("tempVal");
+    const modeVal = document.getElementById("modeVal");
+    const names = ["rgb", "invert", "gray", "greenAccent"];
+
+    function readControls() {
+      return {
+        temp: parseFloat(tempEl.value),
+        mode: parseInt(modeEl.value, 10),
+      };
+    }
+
+    function renderFrame() {
+      const { temp, mode } = readControls();
+      tempVal.textContent = temp.toFixed(2);
+      modeVal.textContent = names[mode] ?? String(mode);
+      applyMode(mode, temp);
+      renderer.render(scene, camera);
+    }
+
+    function downloadPng(filename) {
+      const url = renderer.domElement.toDataURL("image/png");
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename;
+      a.rel = "noopener";
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+    }
+
+    function tick() {
+      renderFrame();
+      requestAnimationFrame(tick);
+    }
+
+    document.getElementById("btnCapture").addEventListener("click", () => {
+      renderFrame();
+      downloadPng("threejs_captura_actual.png");
+    });
+
+    document.getElementById("btnEvidence").addEventListener("click", async () => {
+      const prevTemp = tempEl.value;
+      const prevMode = modeEl.value;
+      modeEl.value = "0";
+
+      tempEl.value = "-0.95";
+      renderFrame();
+      await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+      downloadPng("threejs_temperatura_fria.png");
+
+      await new Promise((r) => setTimeout(r, 450));
+
+      tempEl.value = "0.95";
+      renderFrame();
+      await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+      downloadPng("threejs_temperatura_calida.png");
+
+      tempEl.value = prevTemp;
+      modeEl.value = prevMode;
+    });
+
+    addEventListener("resize", () => {
+      camera.aspect = innerWidth / innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(innerWidth, innerHeight);
+    });
+
+    tick();
+  </script>
+</body>
+</html>
