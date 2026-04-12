@@ -1,0 +1,562 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Modelos de Reflexión: Lambert, Phong, Blinn-Phong y PBR</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      background: #0f0f0f;
+      color: #e0e0e0;
+      font-family: 'Segoe UI', sans-serif;
+      min-height: 100vh;
+    }
+
+    header {
+      padding: 16px 24px;
+      border-bottom: 1px solid #2a2a2a;
+      background: #1a1a1a;
+    }
+
+    header h1 { font-size: 18px; font-weight: 500; color: #fff; }
+    header p  { font-size: 13px; color: #888; margin-top: 2px; }
+
+    #scene-container {
+      width: 100%;
+      position: relative;
+    }
+
+    #labels-bar {
+      display: flex;
+      justify-content: space-around;
+      padding: 6px 0;
+      background: rgba(0,0,0,0.6);
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      z-index: 10;
+      pointer-events: none;
+    }
+
+    .label-tag {
+      font-size: 11px;
+      font-weight: 500;
+      color: #fff;
+      background: rgba(60,60,60,0.8);
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 4px;
+      padding: 3px 10px;
+    }
+
+    #controls-panel {
+      background: #1a1a1a;
+      border-top: 1px solid #2a2a2a;
+      padding: 16px 24px;
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 16px;
+    }
+
+    .ctrl-block label {
+      display: block;
+      font-size: 12px;
+      color: #888;
+      margin-bottom: 6px;
+    }
+
+    .ctrl-block input[type="range"] {
+      width: 100%;
+      accent-color: #4a90e2;
+    }
+
+    .ctrl-block input[type="color"] {
+      width: 100%;
+      height: 32px;
+      border: 1px solid #333;
+      border-radius: 4px;
+      background: none;
+      cursor: pointer;
+      padding: 2px;
+    }
+
+    .ctrl-block .val-display {
+      font-size: 11px;
+      color: #555;
+      text-align: right;
+      margin-top: 2px;
+    }
+
+    .toggle-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-top: 8px;
+      font-size: 13px;
+      color: #aaa;
+      cursor: pointer;
+    }
+
+    #info-section {
+      padding: 20px 24px;
+      background: #141414;
+      border-top: 1px solid #222;
+    }
+
+    #info-section h2 { font-size: 14px; color: #aaa; margin-bottom: 12px; }
+
+    .formula-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 12px;
+    }
+
+    .formula-card {
+      background: #1e1e1e;
+      border: 1px solid #2a2a2a;
+      border-radius: 6px;
+      padding: 12px;
+    }
+
+    .formula-card h3 { font-size: 12px; color: #4a90e2; margin-bottom: 6px; }
+
+    .formula-card code {
+      display: block;
+      font-family: 'Courier New', monospace;
+      font-size: 11px;
+      color: #c8e6c9;
+      line-height: 1.6;
+      white-space: pre;
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>Modelos de Reflexión de Luz</h1>
+  <p>Lambert · Phong · Blinn-Phong · PBR — implementados con Three.js y shaders GLSL</p>
+</header>
+
+<div id="scene-container">
+  <div id="labels-bar">
+    <span class="label-tag">Ambient</span>
+    <span class="label-tag">Lambert</span>
+    <span class="label-tag">Phong</span>
+    <span class="label-tag">Blinn-Phong</span>
+    <span class="label-tag">PBR</span>
+  </div>
+  <canvas id="main-canvas"></canvas>
+</div>
+
+<div id="controls-panel">
+  <div class="ctrl-block">
+    <label>Color del material</label>
+    <input type="color" id="mat-color" value="#3a80d2" />
+  </div>
+
+  <div class="ctrl-block">
+    <label>Shininess — Phong / Blinn-Phong</label>
+    <input type="range" id="shininess" min="1" max="256" value="64" step="1" />
+    <div class="val-display" id="shine-display">64</div>
+  </div>
+
+  <div class="ctrl-block">
+    <label>PBR Roughness (rugosidad)</label>
+    <input type="range" id="roughness" min="0.0" max="1.0" value="0.4" step="0.01" />
+    <div class="val-display" id="rough-display">0.40</div>
+  </div>
+
+  <div class="ctrl-block">
+    <label>PBR Metalness (metalicidad)</label>
+    <input type="range" id="metalness" min="0.0" max="1.0" value="0.0" step="0.01" />
+    <div class="val-display" id="metal-display">0.00</div>
+  </div>
+
+  <div class="ctrl-block">
+    <label>Opciones de escena</label>
+    <label class="toggle-row">
+      <input type="checkbox" id="rotate-light" checked />
+      Rotar luz automáticamente
+    </label>
+    <label class="toggle-row">
+      <input type="checkbox" id="show-wireframe" />
+      Mostrar wireframe
+    </label>
+  </div>
+</div>
+
+<div id="info-section">
+  <h2>Fórmulas implementadas en GLSL</h2>
+  <div class="formula-grid">
+
+    <div class="formula-card">
+      <h3>Lambert (difuso)</h3>
+      <code>N = normalize(normal)
+L = normalize(lightPos - worldPos)
+diff = max(dot(N, L), 0.0)
+color = albedo * (ambient + diff)</code>
+    </div>
+
+    <div class="formula-card">
+      <h3>Phong (especular)</h3>
+      <code>R = reflect(-L, N)
+V = normalize(camPos - worldPos)
+spec = pow(max(dot(R,V),0.0), shininess)
+color = albedo*(ambient+diff) + spec</code>
+    </div>
+
+    <div class="formula-card">
+      <h3>Blinn-Phong (half vector)</h3>
+      <code>H = normalize(L + V)  // half vector
+spec = pow(max(dot(N,H),0.0), shininess)
+// Más eficiente, resultado similar
+color = albedo*(ambient+diff) + spec</code>
+    </div>
+
+    <div class="formula-card">
+      <h3>PBR (MeshStandardMaterial)</h3>
+      <code>// Parámetros físicos reales
+metalness: 0=dieléctrico, 1=metal
+roughness: 0=espejo, 1=mate
+// Three.js calcula la BRDF
+// (Cook-Torrance) internamente</code>
+    </div>
+
+  </div>
+</div>
+
+<!-- Three.js r128 desde CDN -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+
+<script>
+// ============================================================
+// SETUP
+// ============================================================
+const canvas = document.getElementById('main-canvas');
+const container = document.getElementById('scene-container');
+
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+function resizeRenderer() {
+  const w = container.clientWidth;
+  const h = Math.max(300, Math.round(w * 0.45));
+  renderer.setSize(w, h);
+  camera.aspect = w / h;
+  camera.updateProjectionMatrix();
+}
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x111111);
+
+const camera = new THREE.PerspectiveCamera(45, 1, 0.1, 100);
+camera.position.set(0, 1.5, 9);
+camera.lookAt(0, 0, 0);
+
+// ============================================================
+// LIGHTS
+// ============================================================
+const ambientLight = new THREE.AmbientLight(0xffffff, 0.12);
+scene.add(ambientLight);
+
+const pointLight = new THREE.PointLight(0xffffff, 2.5, 40);
+pointLight.position.set(4, 5, 4);
+pointLight.castShadow = true;
+pointLight.shadow.mapSize.width = 1024;
+pointLight.shadow.mapSize.height = 1024;
+scene.add(pointLight);
+
+// Esfera pequeña para visualizar la posición de la luz
+const lightIndicator = new THREE.Mesh(
+  new THREE.SphereGeometry(0.1, 8, 8),
+  new THREE.MeshBasicMaterial({ color: 0xffffaa })
+);
+scene.add(lightIndicator);
+
+// ============================================================
+// SHADERS GLSL
+// ============================================================
+
+// Vertex shader compartido para todos los custom shaders
+const SHARED_VERT = `
+  varying vec3 vNormal;
+  varying vec3 vWorldPos;
+  void main() {
+    // Transformar la normal al espacio del mundo
+    vNormal = normalize(normalMatrix * normal);
+    // Posición del fragmento en el espacio del mundo
+    vWorldPos = (modelMatrix * vec4(position, 1.0)).xyz;
+    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+  }
+`;
+
+// --- 1. Ambient only ---
+// Solo luz ambiente, sin cálculo de iluminación directa
+const ambientOnlyMat = new THREE.ShaderMaterial({
+  uniforms: {
+    uColor:   { value: new THREE.Color(0x3a80d2) },
+    uAmbient: { value: 0.20 },
+  },
+  vertexShader: SHARED_VERT,
+  fragmentShader: `
+    uniform vec3  uColor;
+    uniform float uAmbient;
+    varying vec3  vNormal;
+    varying vec3  vWorldPos;
+    void main() {
+      gl_FragColor = vec4(uColor * uAmbient, 1.0);
+    }
+  `
+});
+
+// --- 2. Lambert (difuso puro) ---
+// I_diffuse = I_light * kd * max(N·L, 0)
+const lambertMat = new THREE.ShaderMaterial({
+  uniforms: {
+    uColor:    { value: new THREE.Color(0x3a80d2) },
+    uLightPos: { value: new THREE.Vector3(4, 5, 4) },
+    uAmbient:  { value: 0.06 },
+  },
+  vertexShader: SHARED_VERT,
+  fragmentShader: `
+    uniform vec3  uColor;
+    uniform vec3  uLightPos;
+    uniform float uAmbient;
+    varying vec3  vNormal;
+    varying vec3  vWorldPos;
+
+    void main() {
+      vec3 N = normalize(vNormal);
+      vec3 L = normalize(uLightPos - vWorldPos); // vector hacia la luz
+
+      // Producto punto: cuánto "mira" la normal hacia la luz
+      float diff = max(dot(N, L), 0.0);
+
+      // Ecuación Lambert completa
+      vec3 color = uColor * (uAmbient + diff);
+      gl_FragColor = vec4(color, 1.0);
+    }
+  `
+});
+
+// --- 3. Phong (difuso + especular con vector R) ---
+// I_specular = I_light * ks * max(R·V, 0)^shininess
+const phongMat = new THREE.ShaderMaterial({
+  uniforms: {
+    uColor:     { value: new THREE.Color(0x3a80d2) },
+    uLightPos:  { value: new THREE.Vector3(4, 5, 4) },
+    uCamPos:    { value: camera.position.clone() },
+    uShininess: { value: 64.0 },
+    uAmbient:   { value: 0.06 },
+  },
+  vertexShader: SHARED_VERT,
+  fragmentShader: `
+    uniform vec3  uColor;
+    uniform vec3  uLightPos;
+    uniform vec3  uCamPos;
+    uniform float uShininess;
+    uniform float uAmbient;
+    varying vec3  vNormal;
+    varying vec3  vWorldPos;
+
+    void main() {
+      vec3 N = normalize(vNormal);
+      vec3 L = normalize(uLightPos - vWorldPos); // hacia la luz
+      vec3 V = normalize(uCamPos - vWorldPos);   // hacia la cámara
+
+      // Componente difusa (Lambert)
+      float diff = max(dot(N, L), 0.0);
+
+      // Vector de reflexión: dirección de rebote del rayo de luz
+      // reflect(-L, N) = 2*(N·L)*N - (-L) = dirección reflejada
+      vec3 R = reflect(-L, N);
+
+      // Componente especular Phong: qué tanto V se alinea con R
+      float spec = pow(max(dot(R, V), 0.0), uShininess);
+
+      vec3 color = uColor * (uAmbient + diff) + vec3(0.9) * spec * 0.65;
+      gl_FragColor = vec4(color, 1.0);
+    }
+  `
+});
+
+// --- 4. Blinn-Phong (difuso + especular con half vector H) ---
+// H = normalize(L + V)
+// I_specular = I_light * ks * max(N·H, 0)^shininess
+const blinnMat = new THREE.ShaderMaterial({
+  uniforms: {
+    uColor:     { value: new THREE.Color(0x3a80d2) },
+    uLightPos:  { value: new THREE.Vector3(4, 5, 4) },
+    uCamPos:    { value: camera.position.clone() },
+    uShininess: { value: 64.0 },
+    uAmbient:   { value: 0.06 },
+  },
+  vertexShader: SHARED_VERT,
+  fragmentShader: `
+    uniform vec3  uColor;
+    uniform vec3  uLightPos;
+    uniform vec3  uCamPos;
+    uniform float uShininess;
+    uniform float uAmbient;
+    varying vec3  vNormal;
+    varying vec3  vWorldPos;
+
+    void main() {
+      vec3 N = normalize(vNormal);
+      vec3 L = normalize(uLightPos - vWorldPos);
+      vec3 V = normalize(uCamPos - vWorldPos);
+
+      // Componente difusa
+      float diff = max(dot(N, L), 0.0);
+
+      // Half vector: a medio camino entre L y V
+      // Más barato de calcular que reflect(-L, N)
+      vec3 H = normalize(L + V);
+
+      // Especular Blinn-Phong: N·H en lugar de R·V
+      float spec = pow(max(dot(N, H), 0.0), uShininess);
+
+      vec3 color = uColor * (uAmbient + diff) + vec3(0.9) * spec * 0.65;
+      gl_FragColor = vec4(color, 1.0);
+    }
+  `
+});
+
+// --- 5. PBR: Three.js MeshStandardMaterial ---
+// Usa Cook-Torrance BRDF internamente (GGX + Smith + Fresnel)
+const pbrMat = new THREE.MeshStandardMaterial({
+  color:     new THREE.Color(0x3a80d2),
+  roughness: 0.4,
+  metalness: 0.0,
+});
+
+// ============================================================
+// CREAR ESFERAS
+// ============================================================
+const sphereGeo = new THREE.SphereGeometry(0.85, 64, 64);
+const materials = [ambientOnlyMat, lambertMat, phongMat, blinnMat, pbrMat];
+const spacing = 2.1;
+const startX = -spacing * 2;
+
+const sphereMeshes = materials.map((mat, i) => {
+  const mesh = new THREE.Mesh(sphereGeo, mat);
+  mesh.position.x = startX + i * spacing;
+  mesh.castShadow = true;
+  scene.add(mesh);
+  return mesh;
+});
+
+// ============================================================
+// SUELO
+// ============================================================
+const floorMesh = new THREE.Mesh(
+  new THREE.PlaneGeometry(30, 30),
+  new THREE.MeshStandardMaterial({ color: 0x1a1a1a, roughness: 0.95 })
+);
+floorMesh.rotation.x = -Math.PI / 2;
+floorMesh.position.y = -1.05;
+floorMesh.receiveShadow = true;
+scene.add(floorMesh);
+
+// ============================================================
+// CONTROLES DE UI
+// ============================================================
+const matColorInput = document.getElementById('mat-color');
+const shineInput    = document.getElementById('shininess');
+const roughInput    = document.getElementById('roughness');
+const metalInput    = document.getElementById('metalness');
+const rotateCheck   = document.getElementById('rotate-light');
+const wireCheck     = document.getElementById('show-wireframe');
+
+const shineDisplay  = document.getElementById('shine-display');
+const roughDisplay  = document.getElementById('rough-display');
+const metalDisplay  = document.getElementById('metal-display');
+
+function updateMaterials() {
+  const c     = new THREE.Color(matColorInput.value);
+  const shine = parseFloat(shineInput.value);
+  const rough = parseFloat(roughInput.value);
+  const metal = parseFloat(metalInput.value);
+
+  shineDisplay.textContent = Math.round(shine);
+  roughDisplay.textContent = rough.toFixed(2);
+  metalDisplay.textContent = metal.toFixed(2);
+
+  // Ambient only
+  ambientOnlyMat.uniforms.uColor.value.copy(c);
+
+  // Lambert
+  lambertMat.uniforms.uColor.value.copy(c);
+
+  // Phong
+  phongMat.uniforms.uColor.value.copy(c);
+  phongMat.uniforms.uShininess.value = shine;
+
+  // Blinn-Phong
+  blinnMat.uniforms.uColor.value.copy(c);
+  blinnMat.uniforms.uShininess.value = shine;
+
+  // PBR
+  pbrMat.color.copy(c);
+  pbrMat.roughness = rough;
+  pbrMat.metalness = metal;
+  pbrMat.needsUpdate = true;
+}
+
+function toggleWireframe(on) {
+  sphereMeshes.forEach(m => {
+    if (m.material.wireframe !== undefined) {
+      m.material.wireframe = on;
+    }
+  });
+}
+
+[matColorInput, shineInput, roughInput, metalInput].forEach(el => {
+  el.addEventListener('input', updateMaterials);
+});
+
+wireCheck.addEventListener('change', () => toggleWireframe(wireCheck.checked));
+
+// ============================================================
+// LOOP DE ANIMACIÓN
+// ============================================================
+let angle = 0;
+
+function animate() {
+  requestAnimationFrame(animate);
+
+  if (rotateCheck.checked) {
+    angle += 0.008;
+    const r = 6.0;
+    const lx = Math.cos(angle) * r;
+    const lz = Math.sin(angle) * r;
+    const ly = 4.5;
+
+    pointLight.position.set(lx, ly, lz);
+    lightIndicator.position.copy(pointLight.position);
+
+    // Actualizar uniforms de posición de luz en shaders custom
+    [lambertMat, phongMat, blinnMat].forEach(mat => {
+      mat.uniforms.uLightPos.value.copy(pointLight.position);
+    });
+
+    // Actualizar posición de cámara en shaders que la necesitan
+    [phongMat, blinnMat].forEach(mat => {
+      mat.uniforms.uCamPos.value.copy(camera.position);
+    });
+  }
+
+  renderer.render(scene, camera);
+}
+
+// ============================================================
+// RESIZE
+// ============================================================
+window.addEventListener('resize', resizeRenderer);
+resizeRenderer();
+animate();
+</script>
+</body>
+</html>
