@@ -1,0 +1,4 @@
+speechrecognition
+pyaudio
+pocketsphinx
+python-osc

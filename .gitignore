@@ -284,4 +284,11 @@ $RECYCLE.BIN/
 # Windows shortcuts
 *.lnk
 
+# Virtual environments
+.venv/
+venv/
+env/
+__pycache__/
+*.pyc
+
 # End of https://www.toptal.com/developers/gitignore/api/visualstudiocode,node,processing,unity,jupyternotebooks,windows
