@@ -1,0 +1,122 @@
+.app-shell {
+  min-height: 100svh;
+  display: grid;
+  grid-template-columns: minmax(260px, 33%) 1fr;
+  gap: 14px;
+  padding: 14px;
+  box-sizing: border-box;
+}
+
+.hud {
+  color: #f5fbff;
+  padding: 24px;
+  border-radius: 18px;
+  border: 1px solid rgba(140, 200, 255, 0.28);
+  background:
+    radial-gradient(circle at 15% 15%, rgba(22, 186, 197, 0.3), transparent 38%),
+    radial-gradient(circle at 85% 85%, rgba(231, 116, 40, 0.3), transparent 42%),
+    rgba(8, 18, 40, 0.72);
+  backdrop-filter: blur(6px);
+  align-self: start;
+  animation: rise-in 0.65s ease-out;
+}
+
+.eyebrow {
+  margin: 0;
+  letter-spacing: 0.12em;
+  font-size: 0.76rem;
+  text-transform: uppercase;
+  color: #9fd8f0;
+}
+
+.hud h1 {
+  margin: 0.65rem 0 0.8rem;
+  line-height: 1.06;
+  font-size: clamp(1.6rem, 3.1vw, 2.2rem);
+}
+
+.hud p {
+  margin: 0;
+  font-size: 0.98rem;
+  line-height: 1.55;
+  color: #d2e7f5;
+}
+
+.hud ul {
+  margin: 1rem 0 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 0.68rem;
+  color: #dbefff;
+  font-size: 0.94rem;
+}
+
+.hud li {
+  display: flex;
+  align-items: center;
+  gap: 0.58rem;
+}
+
+.dot {
+  width: 0.75rem;
+  height: 0.75rem;
+  border-radius: 999px;
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.2);
+}
+
+.sphere {
+  background: #3ec5e0;
+}
+
+.box {
+  background: #f39d3c;
+}
+
+.cylinder {
+  background: #2ed08c;
+}
+
+.canvas-wrap {
+  min-height: 60svh;
+  border-radius: 18px;
+  overflow: hidden;
+  border: 1px solid rgba(145, 204, 255, 0.32);
+  animation: fade-in 0.82s ease-out;
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(15px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes rise-in {
+  from {
+    opacity: 0;
+    transform: translateY(22px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (max-width: 980px) {
+  .app-shell {
+    grid-template-columns: 1fr;
+  }
+
+  .hud {
+    padding: 18px;
+  }
+
+  .canvas-wrap {
+    min-height: 66svh;
+  }
+}
