@@ -1,0 +1,32 @@
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;800&family=JetBrains+Mono:wght@400;600&display=swap');
+
+:root {
+  font-family: 'Outfit', sans-serif;
+  line-height: 1.5;
+  font-weight: 400;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100svh;
+  background:
+    radial-gradient(circle at 8% 6%, #19596b 0%, rgba(25, 89, 107, 0) 42%),
+    radial-gradient(circle at 88% 18%, #a84c22 0%, rgba(168, 76, 34, 0) 38%),
+    linear-gradient(125deg, #01040d 0%, #030a1d 44%, #051228 100%);
+}
+
+#root {
+  min-height: 100svh;
+}
+
+.leva-c-kWgxhW {
+  font-family: 'JetBrains Mono', monospace;
+}

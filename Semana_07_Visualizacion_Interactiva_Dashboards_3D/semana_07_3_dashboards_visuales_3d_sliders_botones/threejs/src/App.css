@@ -1,0 +1,222 @@
+.app-container {
+  width: 100%;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: linear-gradient(135deg, #0f0f1e 0%, #1a1a3e 100%);
+  overflow: hidden;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+.canvas-wrapper {
+  flex: 1;
+  position: relative;
+  overflow: hidden;
+  background: radial-gradient(ellipse at center, #2d2d5f 0%, #0f0f1e 100%);
+}
+
+canvas {
+  display: block;
+  width: 100% !important;
+  height: 100% !important;
+}
+
+/* Leva Panel Styling */
+:global(.leva-panel) {
+  --bg1: rgba(20, 20, 40, 0.95);
+  --bg2: rgba(30, 30, 60, 0.9);
+  --accent1: #667eea;
+  --accent2: #764ba2;
+  --accent3: #f093fb;
+  --text1: #ffffff;
+  --text2: #b8bcc4;
+  --text3: #8b92a0;
+  
+  border-radius: 12px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  font-size: 12px;
+  backdrop-filter: blur(20px);
+  border: 1px solid rgba(102, 126, 234, 0.2);
+}
+
+:global(.leva-panel > div:first-child) {
+  background: linear-gradient(135deg, rgba(102, 126, 234, 0.1), rgba(118, 75, 162, 0.1));
+  border-radius: 12px;
+}
+
+:global(.leva-folder__title) {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  padding: 10px 15px;
+  border-radius: 6px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  border: none;
+}
+
+:global(.leva-folder__title:hover) {
+  box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+  transform: translateX(2px);
+}
+
+:global(.leva-folder__content) {
+  padding: 12px;
+  background: rgba(30, 30, 60, 0.5);
+}
+
+:global(.leva-row) {
+  margin-bottom: 10px;
+}
+
+:global(.leva-label) {
+  color: #b8bcc4;
+  font-weight: 500;
+}
+
+:global(.leva-input) {
+  background: rgba(40, 40, 80, 0.6);
+  border: 1px solid rgba(102, 126, 234, 0.2);
+  color: #ffffff;
+  border-radius: 4px;
+  transition: all 0.2s ease;
+}
+
+:global(.leva-input:hover) {
+  border-color: rgba(102, 126, 234, 0.4);
+  background: rgba(40, 40, 80, 0.8);
+}
+
+:global(.leva-input:focus) {
+  border-color: #667eea;
+  background: rgba(40, 40, 80, 1);
+  box-shadow: 0 0 10px rgba(102, 126, 234, 0.3);
+}
+
+:global(.leva-input-range) {
+  background: linear-gradient(90deg, #667eea, #764ba2);
+  height: 4px;
+  border-radius: 2px;
+}
+
+:global(.leva-input-range::before) {
+  background: linear-gradient(135deg, #667eea, #764ba2);
+  border: 2px solid white;
+  box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
+}
+
+:global(.leva-button) {
+  background: linear-gradient(135deg, #667eea, #764ba2);
+  color: white;
+  border: none;
+  border-radius: 4px;
+  padding: 8px 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+:global(.leva-button:hover) {
+  box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+  transform: translateY(-2px);
+}
+
+:global(.leva-button:active) {
+  transform: translateY(0);
+}
+
+@media (max-width: 768px) {
+  .app-container {
+    height: 100vh;
+  }
+
+  :global(.leva-panel) {
+    max-width: 90vw;
+    font-size: 11px;
+  }
+}
+
+  @media (max-width: 1024px) {
+    border-right: none;
+    border-bottom: 1px solid var(--border);
+  }
+}
+
+#next-steps ul {
+  list-style: none;
+  padding: 0;
+  display: flex;
+  gap: 8px;
+  margin: 32px 0 0;
+
+  .logo {
+    height: 18px;
+  }
+
+  a {
+    color: var(--text-h);
+    font-size: 16px;
+    border-radius: 6px;
+    background: var(--social-bg);
+    display: flex;
+    padding: 6px 12px;
+    align-items: center;
+    gap: 8px;
+    text-decoration: none;
+    transition: box-shadow 0.3s;
+
+    &:hover {
+      box-shadow: var(--shadow);
+    }
+    .button-icon {
+      height: 18px;
+      width: 18px;
+    }
+  }
+
+  @media (max-width: 1024px) {
+    margin-top: 20px;
+    flex-wrap: wrap;
+    justify-content: center;
+
+    li {
+      flex: 1 1 calc(50% - 8px);
+    }
+
+    a {
+      width: 100%;
+      justify-content: center;
+      box-sizing: border-box;
+    }
+  }
+}
+
+#spacer {
+  height: 88px;
+  border-top: 1px solid var(--border);
+  @media (max-width: 1024px) {
+    height: 48px;
+  }
+}
+
+.ticks {
+  position: relative;
+  width: 100%;
+
+  &::before,
+  &::after {
+    content: '';
+    position: absolute;
+    top: -4.5px;
+    border: 5px solid transparent;
+  }
+
+  &::before {
+    left: 0;
+    border-left-color: var(--border);
+  }
+  &::after {
+    right: 0;
+    border-right-color: var(--border);
+  }
+}

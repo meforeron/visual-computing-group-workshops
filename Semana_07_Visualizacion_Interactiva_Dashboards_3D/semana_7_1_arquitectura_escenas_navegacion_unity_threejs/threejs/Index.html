@@ -1,0 +1,815 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Taller 62 - Arquitectura de Escenas</title>
+
+  <!-- Three.js desde CDN - no requiere instalación -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+
+  <style>
+    /* =============================================
+       RESET Y VARIABLES GLOBALES
+       ============================================= */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:        #0a0a0f;
+      --surface:   #12121a;
+      --border:    #2a2a3f;
+      --accent:    #7c3aed;
+      --accent2:   #06b6d4;
+      --accent3:   #f59e0b;
+      --text:      #e2e8f0;
+      --muted:     #64748b;
+      --font-head: 'Courier New', monospace;
+      --font-body: Georgia, serif;
+      --transition: 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    html, body {
+      width: 100%; height: 100%;
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--font-body);
+      overflow: hidden;
+    }
+
+    /* =============================================
+       SISTEMA DE ESCENAS - cada .scene ocupa toda la pantalla
+       ============================================= */
+    .scene {
+      position: fixed;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      opacity: 0;
+      pointer-events: none;
+      transform: translateY(30px);
+      transition: opacity var(--transition), transform var(--transition);
+      z-index: 1;
+    }
+
+    /* La escena activa es visible e interactuable */
+    .scene.active {
+      opacity: 1;
+      pointer-events: all;
+      transform: translateY(0);
+    }
+
+    /* Canvas de Three.js: ocupa siempre el fondo */
+    #bg-canvas {
+      position: fixed;
+      inset: 0;
+      z-index: 0;
+    }
+
+    /* =============================================
+       ESCENA 1 - MENÚ PRINCIPAL
+       ============================================= */
+    #scene-menu {
+      gap: 2rem;
+      text-align: center;
+    }
+
+    .menu-badge {
+      font-family: var(--font-head);
+      font-size: 0.75rem;
+      letter-spacing: 0.3em;
+      text-transform: uppercase;
+      color: var(--accent2);
+      border: 1px solid var(--accent2);
+      padding: 0.3rem 1rem;
+      border-radius: 2px;
+      animation: pulse 2s infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50%       { opacity: 0.5; }
+    }
+
+    .menu-title {
+      font-family: var(--font-head);
+      font-size: clamp(2rem, 6vw, 4.5rem);
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      line-height: 1;
+      color: var(--text);
+    }
+
+    .menu-title span {
+      display: block;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .menu-subtitle {
+      font-size: 1.1rem;
+      color: var(--muted);
+      max-width: 400px;
+      line-height: 1.6;
+    }
+
+    .menu-nav {
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+      width: 100%;
+      max-width: 320px;
+      margin-top: 1rem;
+    }
+
+    /* =============================================
+       BOTONES - estilos reutilizables
+       ============================================= */
+    .btn {
+      padding: 0.85rem 2rem;
+      border: none;
+      border-radius: 4px;
+      font-family: var(--font-head);
+      font-size: 0.9rem;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .btn::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: rgba(255,255,255,0.08);
+      opacity: 0;
+      transition: opacity 0.2s;
+    }
+
+    .btn:hover::before { opacity: 1; }
+    .btn:active { transform: scale(0.97); }
+
+    .btn-primary {
+      background: var(--accent);
+      color: white;
+      box-shadow: 0 0 20px rgba(124,58,237,0.4);
+    }
+
+    .btn-primary:hover {
+      box-shadow: 0 0 35px rgba(124,58,237,0.7);
+      transform: translateY(-2px);
+    }
+
+    .btn-secondary {
+      background: transparent;
+      color: var(--text);
+      border: 1px solid var(--border);
+    }
+
+    .btn-secondary:hover {
+      border-color: var(--accent2);
+      color: var(--accent2);
+      transform: translateY(-2px);
+    }
+
+    /* =============================================
+       ESCENA 2 - JUEGO
+       ============================================= */
+    #scene-juego {
+      justify-content: flex-start;
+      padding: 2rem;
+      gap: 0;
+    }
+
+    .juego-header {
+      width: 100%;
+      max-width: 900px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding-bottom: 1.5rem;
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 2rem;
+    }
+
+    .juego-header h2 {
+      font-family: var(--font-head);
+      font-size: 1rem;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      color: var(--accent2);
+    }
+
+    .score-display {
+      font-family: var(--font-head);
+      font-size: 1.1rem;
+      color: var(--accent3);
+    }
+
+    .score-display span {
+      font-size: 1.8rem;
+      font-weight: bold;
+    }
+
+    /* Contenedor del canvas 3D del juego */
+    .juego-viewport {
+      width: 100%;
+      max-width: 900px;
+      height: 380px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      position: relative;
+      overflow: hidden;
+      background: #05050d;
+    }
+
+    #game-canvas {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+
+    .juego-controls {
+      width: 100%;
+      max-width: 900px;
+      display: flex;
+      gap: 1rem;
+      margin-top: 1.5rem;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .controls-hint {
+      font-family: var(--font-head);
+      font-size: 0.75rem;
+      color: var(--muted);
+      letter-spacing: 0.1em;
+    }
+
+    .controls-hint kbd {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 3px;
+      padding: 0.1rem 0.4rem;
+      font-size: 0.7rem;
+    }
+
+    .game-buttons { display: flex; gap: 0.75rem; }
+
+    /* =============================================
+       ESCENA 3 - CRÉDITOS
+       ============================================= */
+    #scene-creditos {
+      gap: 2rem;
+      text-align: center;
+      padding: 2rem;
+    }
+
+    .creditos-title {
+      font-family: var(--font-head);
+      font-size: clamp(1.5rem, 4vw, 3rem);
+      letter-spacing: 0.05em;
+      color: var(--accent3);
+    }
+
+    .creditos-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 1rem;
+      max-width: 800px;
+      width: 100%;
+    }
+
+    .credito-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 1.5rem;
+      transition: border-color 0.2s, transform 0.2s;
+    }
+
+    .credito-card:hover {
+      border-color: var(--accent);
+      transform: translateY(-4px);
+    }
+
+    .credito-icon {
+      font-size: 2rem;
+      margin-bottom: 0.75rem;
+    }
+
+    .credito-card h3 {
+      font-family: var(--font-head);
+      font-size: 0.85rem;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--accent2);
+      margin-bottom: 0.5rem;
+    }
+
+    .credito-card p {
+      font-size: 0.9rem;
+      color: var(--muted);
+      line-height: 1.5;
+    }
+
+    .tech-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      justify-content: center;
+      max-width: 600px;
+    }
+
+    .tech-tag {
+      font-family: var(--font-head);
+      font-size: 0.75rem;
+      padding: 0.25rem 0.75rem;
+      border: 1px solid var(--border);
+      border-radius: 100px;
+      color: var(--muted);
+      letter-spacing: 0.05em;
+    }
+
+    /* =============================================
+       HUD de navegación global (barra inferior)
+       ============================================= */
+    .scene-hud {
+      position: fixed;
+      bottom: 1.5rem;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 100;
+      display: flex;
+      gap: 0.5rem;
+      background: rgba(18,18,26,0.9);
+      border: 1px solid var(--border);
+      padding: 0.5rem;
+      border-radius: 50px;
+      backdrop-filter: blur(12px);
+    }
+
+    .hud-dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: var(--border);
+      transition: all 0.3s ease;
+      cursor: pointer;
+      border: none;
+    }
+
+    .hud-dot.active {
+      background: var(--accent2);
+      box-shadow: 0 0 8px var(--accent2);
+      width: 24px;
+      border-radius: 4px;
+    }
+
+    /* =============================================
+       NOMBRE DE ESCENA ACTUAL (esquina superior)
+       ============================================= */
+    .scene-label {
+      position: fixed;
+      top: 1.5rem;
+      left: 1.5rem;
+      z-index: 100;
+      font-family: var(--font-head);
+      font-size: 0.7rem;
+      letter-spacing: 0.3em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+
+    .scene-label .current-name {
+      color: var(--accent2);
+      display: block;
+      font-size: 0.85rem;
+      margin-top: 0.2rem;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ============================================================
+       CANVAS DE FONDO - Three.js renderiza aquí las partículas
+       ============================================================ -->
+  <canvas id="bg-canvas"></canvas>
+
+  <!-- ============================================================
+       HUD GLOBAL - indicador de escena activa
+       ============================================================ -->
+  <div class="scene-label">
+    ESCENA ACTUAL
+    <span class="current-name" id="label-name">MENÚ</span>
+  </div>
+
+  <!-- Puntos de navegación rápida -->
+  <div class="scene-hud">
+    <button class="hud-dot active" onclick="navegarA('menu')"   title="Menú"></button>
+    <button class="hud-dot"        onclick="navegarA('juego')"  title="Juego"></button>
+    <button class="hud-dot"        onclick="navegarA('creditos')" title="Créditos"></button>
+  </div>
+
+  <!-- ============================================================
+       ESCENA 1: MENÚ PRINCIPAL
+       ============================================================ -->
+  <section id="scene-menu" class="scene active">
+    <div class="menu-badge">◈ Taller 62 — Arquitectura de Escenas</div>
+
+    <h1 class="menu-title">
+      SPACE
+      <span>EXPLORER</span>
+    </h1>
+
+    <p class="menu-subtitle">
+      Una demostración de arquitectura multi-escena con Three.js.
+      Navega entre el menú, el juego y los créditos.
+    </p>
+
+    <!-- Botones de navegación del menú -->
+    <nav class="menu-nav">
+      <!-- IrAEscenaJuego: equivalente al método Unity SceneManager.LoadScene("Juego") -->
+      <button class="btn btn-primary" onclick="navegarA('juego')">
+        ▶ Iniciar Juego
+      </button>
+      <!-- IrAEscenaCreditos: equivalente a SceneManager.LoadScene("Creditos") -->
+      <button class="btn btn-secondary" onclick="navegarA('creditos')">
+        ◈ Ver Créditos
+      </button>
+    </nav>
+  </section>
+
+  <!-- ============================================================
+       ESCENA 2: JUEGO
+       ============================================================ -->
+  <section id="scene-juego" class="scene">
+
+    <div class="juego-header">
+      <h2>⬡ Escena de Juego</h2>
+      <div class="score-display">
+        PUNTOS: <span id="score-value">0</span>
+      </div>
+    </div>
+
+    <!-- Canvas exclusivo de la escena de juego -->
+    <div class="juego-viewport">
+      <canvas id="game-canvas"></canvas>
+    </div>
+
+    <div class="juego-controls">
+      <div class="controls-hint">
+        Haz clic en los cubos para sumar puntos &nbsp;|&nbsp;
+        <kbd>ESC</kbd> vuelve al menú
+      </div>
+      <div class="game-buttons">
+        <!-- Volver al menú: SceneManager.LoadScene("Menu") -->
+        <button class="btn btn-secondary" onclick="navegarA('menu')">← Menú</button>
+        <button class="btn btn-secondary" onclick="navegarA('creditos')">Créditos →</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================================================
+       ESCENA 3: CRÉDITOS
+       ============================================================ -->
+  <section id="scene-creditos" class="scene">
+
+    <p style="font-family:var(--font-head);font-size:0.75rem;letter-spacing:0.3em;color:var(--muted);">
+      FIN DEL RECORRIDO
+    </p>
+
+    <h2 class="creditos-title">✦ Créditos &amp; Tecnologías</h2>
+
+    <div class="creditos-grid">
+      <div class="credito-card">
+        <div class="credito-icon">🏗️</div>
+        <h3>Arquitectura</h3>
+        <p>Sistema de escenas propio sin frameworks, usando CSS transitions y JS puro para la navegación.</p>
+      </div>
+      <div class="credito-card">
+        <div class="credito-icon">🌌</div>
+        <h3>Renderizado</h3>
+        <p>Three.js r128 para la escena 3D de fondo y el viewport interactivo del juego.</p>
+      </div>
+      <div class="credito-card">
+        <div class="credito-icon">🎮</div>
+        <h3>Interacción</h3>
+        <p>Raycasting de Three.js para detectar clics sobre objetos 3D. Sin librerías adicionales.</p>
+      </div>
+      <div class="credito-card">
+        <div class="credito-icon">📦</div>
+        <h3>Distribución</h3>
+        <p>Archivo HTML único. No requiere servidor, npm ni build. Compatible con cualquier navegador moderno.</p>
+      </div>
+    </div>
+
+    <div class="tech-list">
+      <span class="tech-tag">Three.js r128</span>
+      <span class="tech-tag">HTML5 Canvas</span>
+      <span class="tech-tag">CSS Custom Properties</span>
+      <span class="tech-tag">Vanilla JS ES6+</span>
+      <span class="tech-tag">WebGL</span>
+      <span class="tech-tag">Raycasting</span>
+    </div>
+
+    <button class="btn btn-primary" onclick="navegarA('menu')" style="margin-top:1rem;">
+      ← Volver al Inicio
+    </button>
+  </section>
+
+
+  <!-- ============================================================
+       JAVASCRIPT - Lógica principal
+       ============================================================ -->
+  <script>
+    // ================================================================
+    // MÓDULO 1: SISTEMA DE NAVEGACIÓN ENTRE ESCENAS
+    // Equivalente a SceneManager.LoadScene() de Unity
+    // ================================================================
+
+    // Estado global: cuál escena está activa
+    const estadoApp = {
+      escenaActual: 'menu',
+      puntos: 0
+    };
+
+    // Mapa de nombres legibles para el HUD
+    const nombresEscenas = {
+      menu:     'MENÚ PRINCIPAL',
+      juego:    'ESCENA DE JUEGO',
+      creditos: 'CRÉDITOS'
+    };
+
+    /**
+     * navegarA(nombreEscena)
+     * Oculta la escena actual y activa la nueva.
+     * Equivalente a SceneManager.LoadScene("NombreEscena") en Unity.
+     */
+    function navegarA(nombreEscena) {
+      // 1. Desactivar escena anterior
+      const escenaAnterior = document.getElementById(`scene-${estadoApp.escenaActual}`);
+      if (escenaAnterior) escenaAnterior.classList.remove('active');
+
+      // 2. Activar nueva escena
+      const escenaNueva = document.getElementById(`scene-${nombreEscena}`);
+      if (escenaNueva) escenaNueva.classList.add('active');
+
+      // 3. Actualizar estado
+      estadoApp.escenaActual = nombreEscena;
+
+      // 4. Actualizar HUD (puntos indicadores)
+      actualizarHUD(nombreEscena);
+
+      // 5. Cambiar label
+      document.getElementById('label-name').textContent = nombresEscenas[nombreEscena];
+
+      // 6. Ciclo de vida de escena
+      if (nombreEscena === 'juego') onJuegoEnter();
+      if (nombreEscena === 'menu')  onMenuEnter();
+
+      // 7. Cambiar fondo 3D según escena
+      cambiarFondo(nombreEscena);
+    }
+
+    /** Actualiza los dots del HUD */
+    function actualizarHUD(escenaActiva) {
+      const escenas = ['menu', 'juego', 'creditos'];
+      document.querySelectorAll('.hud-dot').forEach((dot, i) => {
+        dot.classList.toggle('active', escenas[i] === escenaActiva);
+      });
+    }
+
+    // ================================================================
+    // MÓDULO 2: ESCENA DE FONDO - Three.js (partículas y geometría)
+    // ================================================================
+
+    const bgCanvas  = document.getElementById('bg-canvas');
+    const bgRenderer = new THREE.WebGLRenderer({ canvas: bgCanvas, antialias: true, alpha: true });
+    bgRenderer.setPixelRatio(window.devicePixelRatio);
+    bgRenderer.setClearColor(0x0a0a0f, 1);
+
+    const bgScene  = new THREE.Scene();
+    const bgCamera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
+    bgCamera.position.z = 5;
+
+    // --- Partículas de fondo (estrellas) ---
+    const starGeo = new THREE.BufferGeometry();
+    const starCount = 2000;
+    const starPos = new Float32Array(starCount * 3);
+    for (let i = 0; i < starCount * 3; i++) {
+      starPos[i] = (Math.random() - 0.5) * 60;
+    }
+    starGeo.setAttribute('position', new THREE.BufferAttribute(starPos, 3));
+    const starMat = new THREE.PointsMaterial({ color: 0x8888bb, size: 0.06 });
+    const stars   = new THREE.Points(starGeo, starMat);
+    bgScene.add(stars);
+
+    // --- Toroide decorativo (cambia color según escena) ---
+    const torusGeo = new THREE.TorusKnotGeometry(1.2, 0.35, 120, 16);
+    const torusMat = new THREE.MeshStandardMaterial({
+      color: 0x7c3aed,
+      wireframe: true,
+      transparent: true,
+      opacity: 0.25
+    });
+    const torus = new THREE.Mesh(torusGeo, torusMat);
+    torus.position.set(3.5, -0.5, -2);
+    bgScene.add(torus);
+
+    // Luz ambiental + point light
+    bgScene.add(new THREE.AmbientLight(0xffffff, 0.4));
+    const pLight = new THREE.PointLight(0x7c3aed, 2, 20);
+    pLight.position.set(-3, 3, 3);
+    bgScene.add(pLight);
+
+    /** Cambia el color del toroide y la luz según la escena activa */
+    const coloresPorEscena = {
+      menu:     { torus: 0x7c3aed, light: 0x7c3aed },
+      juego:    { torus: 0x06b6d4, light: 0x06b6d4 },
+      creditos: { torus: 0xf59e0b, light: 0xf59e0b }
+    };
+
+    function cambiarFondo(escena) {
+      const col = coloresPorEscena[escena];
+      torusMat.color.setHex(col.torus);
+      pLight.color.setHex(col.light);
+    }
+
+    // Loop de animación del fondo
+    function animarFondo() {
+      requestAnimationFrame(animarFondo);
+      torus.rotation.x += 0.003;
+      torus.rotation.y += 0.005;
+      stars.rotation.y  += 0.0002;
+      bgRenderer.render(bgScene, bgCamera);
+    }
+    animarFondo();
+
+    // ================================================================
+    // MÓDULO 3: ESCENA DE JUEGO - Three.js interactivo
+    // ================================================================
+
+    const gameCanvas   = document.getElementById('game-canvas');
+    const gameRenderer = new THREE.WebGLRenderer({ canvas: gameCanvas, antialias: true });
+    gameRenderer.setPixelRatio(window.devicePixelRatio);
+    gameRenderer.setClearColor(0x05050d, 1);
+
+    const gameScene  = new THREE.Scene();
+    const gameCamera = new THREE.PerspectiveCamera(
+      60,
+      gameCanvas.offsetWidth / gameCanvas.offsetHeight,
+      0.1, 100
+    );
+    gameCamera.position.set(0, 2, 8);
+    gameCamera.lookAt(0, 0, 0);
+
+    // Luces del juego
+    gameScene.add(new THREE.AmbientLight(0xffffff, 0.5));
+    const gamePLight = new THREE.PointLight(0x06b6d4, 3, 30);
+    gamePLight.position.set(0, 5, 5);
+    gameScene.add(gamePLight);
+
+    // --- Grilla de cubos interactivos ---
+    const cubos = [];
+    const coloresCubos = [0x7c3aed, 0x06b6d4, 0xf59e0b, 0xec4899, 0x22c55e];
+    const cuboGeo = new THREE.BoxGeometry(1, 1, 1);
+
+    for (let i = 0; i < 9; i++) {
+      const mat = new THREE.MeshStandardMaterial({
+        color: coloresCubos[i % coloresCubos.length],
+        roughness: 0.3,
+        metalness: 0.6
+      });
+      const cubo = new THREE.Mesh(cuboGeo, mat);
+      // Posición en grilla 3x3
+      cubo.position.set(
+        (i % 3 - 1) * 2.5,
+        0,
+        Math.floor(i / 3) * -2
+      );
+      cubo.userData = { velocidadRotY: 0.01 + Math.random() * 0.02, indice: i };
+      gameScene.add(cubo);
+      cubos.push(cubo);
+    }
+
+    // --- Plano de suelo ---
+    const sueloGeo = new THREE.PlaneGeometry(20, 20);
+    const sueloMat = new THREE.MeshStandardMaterial({
+      color: 0x12121a,
+      roughness: 1,
+      metalness: 0
+    });
+    const suelo = new THREE.Mesh(sueloGeo, sueloMat);
+    suelo.rotation.x = -Math.PI / 2;
+    suelo.position.y = -0.5;
+    gameScene.add(suelo);
+
+    // --- Raycaster para detectar clics en objetos 3D ---
+    const raycaster = new THREE.Raycaster();
+    const mouse     = new THREE.Vector2();
+
+    gameCanvas.addEventListener('click', (event) => {
+      // Solo si estamos en la escena de juego
+      if (estadoApp.escenaActual !== 'juego') return;
+
+      const rect = gameCanvas.getBoundingClientRect();
+      // Convertir coordenadas de pantalla a espacio normalizado (-1 a 1)
+      mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+      mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+
+      raycaster.setFromCamera(mouse, gameCamera);
+      const intersecciones = raycaster.intersectObjects(cubos);
+
+      if (intersecciones.length > 0) {
+        const cuboGolpeado = intersecciones[0].object;
+        // Animación de "golpe": escala hacia arriba y vuelve
+        cuboGolpeado.scale.setScalar(1.3);
+        setTimeout(() => cuboGolpeado.scale.setScalar(1), 150);
+
+        // Cambiar color al hacer clic
+        cuboGolpeado.material.color.setHex(
+          coloresCubos[Math.floor(Math.random() * coloresCubos.length)]
+        );
+
+        // Sumar punto
+        estadoApp.puntos++;
+        document.getElementById('score-value').textContent = estadoApp.puntos;
+      }
+    });
+
+    let juegoActivo = false;
+
+    function animarJuego() {
+      if (!juegoActivo) return;
+      requestAnimationFrame(animarJuego);
+
+      cubos.forEach(cubo => {
+        cubo.rotation.y += cubo.userData.velocidadRotY;
+        // Pequeña oscilación vertical
+        cubo.position.y = Math.sin(Date.now() * 0.001 + cubo.userData.indice) * 0.15;
+      });
+
+      // Ajustar aspecto si el canvas cambió de tamaño
+      const w = gameCanvas.offsetWidth;
+      const h = gameCanvas.offsetHeight;
+      if (gameCanvas.width !== w || gameCanvas.height !== h) {
+        gameRenderer.setSize(w, h, false);
+        gameCamera.aspect = w / h;
+        gameCamera.updateProjectionMatrix();
+      }
+
+      gameRenderer.render(gameScene, gameCamera);
+    }
+
+    /** Se llama al entrar a la escena de juego */
+    function onJuegoEnter() {
+      juegoActivo = true;
+      animarJuego();
+      // Ajustar tamaño del renderer de juego
+      setTimeout(() => {
+        const w = gameCanvas.offsetWidth;
+        const h = gameCanvas.offsetHeight;
+        gameRenderer.setSize(w, h, false);
+        gameCamera.aspect = w / h;
+        gameCamera.updateProjectionMatrix();
+      }, 50);
+    }
+
+    function onMenuEnter() {
+      // Pausar juego al salir (liberar recursos de CPU)
+      juegoActivo = false;
+    }
+
+    // ================================================================
+    // MÓDULO 4: RESPONSIVE - Ajustar canvas de fondo al resize
+    // ================================================================
+    function ajustarTamanio() {
+      const w = window.innerWidth;
+      const h = window.innerHeight;
+      bgRenderer.setSize(w, h);
+      bgCamera.aspect = w / h;
+      bgCamera.updateProjectionMatrix();
+    }
+
+    window.addEventListener('resize', ajustarTamanio);
+    ajustarTamanio();
+
+    // ================================================================
+    // MÓDULO 5: ATAJOS DE TECLADO
+    // ================================================================
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && estadoApp.escenaActual !== 'menu') {
+        navegarA('menu');
+      }
+    });
+
+    // Inicializar en menú
+    navegarA('menu');
+  </script>
+</body>
+</html>

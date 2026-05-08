@@ -1,0 +1,26 @@
+# ─────────────────────────────────────────────────────────────
+# Taller – Interfaces Multimodales: Voz y Gestos
+# requirements.txt — versiones compatibles con Python 3.10
+#
+# INSTALACIÓN EN WINDOWS:
+#   1. python -m pip install pip==24.0 --trusted-host pypi.org --trusted-host files.pythonhosted.org
+#   2. pip install --trusted-host pypi.org --trusted-host files.pythonhosted.org -r requirements.txt
+# ─────────────────────────────────────────────────────────────
+
+# NumPy 1.x — NumPy 2.x rompe OpenCV y MediaPipe en Python 3.10
+numpy==1.26.4
+
+# Captura y procesamiento de video — última versión compatible con numpy 1.x
+opencv-python==4.8.1.78
+
+# Detección de gestos — compatible con Python 3.10 y numpy 1.26
+mediapipe==0.10.14
+
+# Reconocimiento de voz
+SpeechRecognition==3.10.4
+
+# Interfaz de audio para micrófono
+pyaudio==0.2.14
+
+# Escena visual — 2.5.x no requiere compilar desde fuente en Windows
+pygame==2.5.2
