@@ -1,0 +1,13 @@
+# ============================================================
+#  requirements.txt
+#  Taller: Detección de Objetos en Tiempo Real con YOLO
+# ============================================================
+# Instalar con:
+#   pip install -r requirements.txt
+
+ultralytics>=8.2.0      # YOLOv8 + modelos preentrenados COCO
+opencv-python>=4.9.0    # Captura y visualización de video
+numpy>=1.26.0           # Operaciones numéricas
+torch>=2.2.0            # Backend de deep learning (CPU o GPU)
+torchvision>=0.17.0     # Complemento de torch para visión
+matplotlib>=3.8.0       # Gráficas opcionales de métricas
