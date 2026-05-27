@@ -162,7 +162,7 @@ Aporte hecho por Melissa Forero:
 - Evaluación cuantitativa, generación de la matriz de confusión y visualizaciones de resultados.
 - Documentación, captura y edición de imágenes/GIFs en `media/`, y preparación del README final para entrega.
 
-
+```
 ---
 
 ## Estructura del proyecto
@@ -175,6 +175,7 @@ semana_11_4_transfer_learning_yolo_deteccion_personalizada/
 │   └── python1.jpg
 └── README.md
 ```
+---
 
 ## Referencias
 
