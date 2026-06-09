@@ -1,6 +1,6 @@
 # Explorando el Universo Latente: Introducción a Stable Diffusion
 
-## Estudiante
+## Estudiantes
 
 - Andres Felipe Galindo Gonzalez
 - Stephan Alian Roland Martiquet Garcia
@@ -10,13 +10,15 @@
 
 ## Fecha de entrega
 
-`2026-06-01`
+2026-06-01
 
 ---
 
 ## Descripción breve
 
-Explicación clara del objetivo del taller y lo que se desarrolló. Describe en 2-3 párrafos qué se pretendía explorar, aplicar o construir, y qué se logró implementar.
+En este taller exploramos el flujo de trabajo de generación de imágenes con Stable Diffusion usando la librería `diffusers` de Hugging Face en un entorno tipo Colab. El objetivo fue comprender el proceso desde la semilla y el prompt hasta las variantes visuales que se obtienen al cambiar parámetros como el `guidance_scale`, el `seed`, y los modificadores de estilo.
+
+Se implementaron scripts y notebooks para experimentar con prompts, estilos (p. ej. "oil painting", "cyberpunk", "photorealistic") y escalas de guidance, además de guardar ejemplos visuales en la carpeta `media/`. El resultado es una pequeña galería que muestra cómo los ajustes y las instrucciones de estilo afectan la estética y el detalle de las imágenes generadas.
 
 ---
 
@@ -24,7 +26,14 @@ Explicación clara del objetivo del taller y lo que se desarrolló. Describe en 
 
 ### Python
 
-Descripción de lo implementado en Python, herramientas utilizadas (OpenCV, PyTorch, trimesh, etc.) y funcionalidad lograda.
+- Entorno: Notebook Colab (`semana_12_7_stable_diffusion_diffusers_colab.ipynb`).
+- Librerías usadas: `diffusers`, `transformers`, `torch`, `accelerate`, `safetensors`, `PIL`/`Pillow`, `numpy`.
+- Funcionalidad implementada:
+	- Carga de un pipeline de Stable Diffusion (inpainting/text-to-image según el checkpoint disponible).
+	- Control de `seed` para reproducibilidad y generación por lotes.
+	- Barrido de `guidance_scale` para comparar efecto en nitidez y adherencia al prompt.
+	- Uso de promts compuestos con modificadores de estilo para generar variaciones (p. ej. "oil painting", "cyberpunk style", "photorealistic").
+	- Guardado automático de salidas en `media/` y visualización en el notebook.
 
 ---
 
@@ -32,94 +41,92 @@ Descripción de lo implementado en Python, herramientas utilizadas (OpenCV, PyTo
 
 ### Python 
 
-![Resultado Python 1](./media/python_resultado_1.gif)
+![Resultado Python 1](./media/python1.png)
 
-Descripción de lo que muestra la imagen/GIF.
-
-![Resultado Python 2](./media/python_resultado_2.png)
-
-Descripción de lo que muestra la imagen.
+![Resultado Python 2](./media/python2.png)
 
 ---
 
 ## Código relevante
 
-### Python:
+Fragmento de ejemplo extraído del notebook para generar imágenes con `diffusers`:
 
 ```python
-import cv2
-import numpy as np
+from diffusers import StableDiffusionPipeline
+import torch
 
-# Cargar imagen
-image = cv2.imread('input.jpg')
+model_id = "runwayml/stable-diffusion-v1-5"
+pipe = StableDiffusionPipeline.from_pretrained(model_id, torch_dtype=torch.float16)
+pipe = pipe.to("cuda")
 
-# Aplicar filtro
-filtered = cv2.GaussianBlur(image, (5, 5), 0)
+def gen(prompt, seed=42, guidance_scale=7.5, num_inference_steps=50):
+		generator = torch.Generator(device="cuda").manual_seed(seed)
+		images = pipe(prompt, guidance_scale=guidance_scale, num_inference_steps=num_inference_steps, generator=generator).images
+		return images[0]
+
+img = gen("A misty forest, cinematic lighting, ultra-detailed", seed=1234, guidance_scale=7.5)
+img.save("media/result_seed1234_guid7.5.png")
 ```
 
 ---
 
 ## Prompts utilizados
 
-```
-"Crea un script en Python que detecte bordes usando el algoritmo de Canny"
-
-"Explícame cómo implementar flujo óptico con OpenCV"
-
-"Genera un shader básico en GLSL para efecto de ondas"
-```
-
-Si no utilizaste IA generativa, indica: "No se utilizaron prompts de IA en este taller."
-
+- Base: "A misty forest, cinematic lighting, ultra-detailed"
+- Con estilo: "A misty forest, cinematic lighting, ultra-detailed, oil painting"
+- Cyberpunk: "A dark castle on a cliff, neon lights, cyberpunk style, dramatic composition"
+- Photorealistic: "Ancient castle on a hill, photorealistic, natural lighting, high detail"
+- Experimento de control: repetir el mismo prompt variando `seed` y `guidance_scale` para aislar efectos.
 ---
 
 ## Aprendizajes y dificultades
 
 ### Aprendizajes
 
-¿Qué aprendiste o reforzaste con este taller? ¿Qué conceptos técnicos quedaron más claros?
+- Entender el rol del `guidance_scale` y cómo equilibra creatividad vs fidelidad al prompt.
+- Importancia de la selección de `seed` y del preprocesamiento mínimo del prompt (orden de adjetivos, prioridades).
+- Flujo de trabajo práctico con `diffusers`: cargar modelos, pasar a GPU, y guardar resultados reproducibles.
 
 ### Dificultades
 
-¿Qué parte fue más compleja o desafiante? ¿Cómo lo resolviste?
+- Limitaciones de memoria en GPU en entornos gratuitos (Colab). Se mitigó reduciendo `num_inference_steps`, usando `torch_dtype=torch.float16` y generando por lotes pequeños.
+- Ajustar prompts para evitar artefactos y lograr coherencia en escenas complejas.
 
 ### Mejoras futuras
 
-¿Qué mejorarías o qué aplicarías en futuros proyectos?
+- Añadir una interfaz simple (gráfica o web) para ajustar parámetros en tiempo real.
+- Integrar técnicas de imagen condicionada (init image / inpainting) para mayor control composicional.
+- Añadir un `requirements.txt` y un script de espera/cola para ejecuciones repetibles en servidores con GPU.
 
 ---
 
 ## Contribuciones grupales
 
-Aporte por Meliss Forero:
+Aporte por Melissa Forero:
 
-```markdown
-- Programé el detector de características SIFT en Python
-- Implementé la interfaz de usuario en Three.js
-- Generé los GIFs y documentación del README
-- Realicé las pruebas de rendimiento y optimización
-```
+- experimentos con barridos de `guidance_scale` y documentación de resultados.
+- preparación del notebook y manejo de seeds y batch generation.
+- pruebas de estilos y limpieza de prompts.
+- instalación de dependencias y pruebas en Colab.
 
 ---
 
 ## Estructura del proyecto
 
 ```
-semana_XX_Y_nombre_taller/
-├── python/          # Código Python (si aplica)
-├── unity/           # Proyecto Unity (si aplica)
-├── threejs/         # Código Three.js/React (si aplica)
-├── processing/      # Código Processing (si aplica)
-├── media/           # OBLIGATORIO: Imágenes, videos, GIFs
-└── README.md        # Este archivo
+semana_12_7_stable_diffusion_diffusers_colab/
+├── media/                                   # Imágenes y GIFs generados
+├── python/
+│   └── semana_12_7_stable_diffusion_diffusers_colab.ipynb
+└── README.md
 ```
 
 ---
 
 ## Referencias
 
-- Documentación oficial de OpenCV: https://docs.opencv.org/
-- Tutorial de React Three Fiber: https://docs.pmnd.rs/react-three-fiber/
-- Paper: "SIFT: Scale-Invariant Feature Transform" - David Lowe
+- Hugging Face Diffusers: https://huggingface.co/docs/diffusers
+- Stable Diffusion paper and model cards
+- Documentación de `torch` y `transformers`
 
 ---
