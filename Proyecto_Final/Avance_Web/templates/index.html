@@ -19,12 +19,22 @@
                 <i class="fas fa-cloud-upload-alt"></i>
                 <h3>Sube tu factura</h3>
                 <p>Arrastra una imagen o haz clic para seleccionar</p>
+                <!-- file input: covers whole zone -->
                 <input type="file" id="file-input" accept="image/*">
             </div>
+
+            <!-- 2.5 — Camera button (mobile opens camera, desktop opens file picker) -->
+            <button id="camera-btn" class="camera-btn" title="Tomar foto con cámara">
+                <i class="fas fa-camera"></i> Usar cámara
+            </button>
+            <!-- Hidden input with capture for mobile camera -->
+            <input type="file" id="camera-input" accept="image/*" capture="environment" style="display:none;">
+
             <div id="loader"></div>
             <p id="status-msg" style="margin-top: 10px; font-size: 0.9rem; color: var(--accent); display:none;">
                 Procesando información con IA (EasyOCR)...
             </p>
+            <p id="error-msg" style="display:none; margin-top: 10px; font-size: 0.9rem; color: #f87171;"></p>
         </section>
 
         <div class="results-grid" id="results-container">
@@ -38,7 +48,7 @@
 
             <!-- Edges -->
             <div class="card">
-                <div class="card-header">Deteccin de Bordes (Canny)</div>
+                <div class="card-header">Detección de Bordes (Canny)</div>
                 <div class="image-container">
                     <img id="img-edge" src="" alt="Edges">
                 </div>
@@ -62,21 +72,29 @@
 
             <!-- Datos Extraidos -->
             <div class="card" style="grid-column: span 1;">
-                <div class="card-header">Informacin Extraida</div>
+                <div class="card-header">Información Extraída</div>
                 <div class="data-output">
                     <div class="info-item">
-                        <span class="info-label">Fecha:</span>
+                        <span class="info-label"><i class="fas fa-store"></i> Comercio:</span>
+                        <span class="info-value" id="val-merchant">---</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label"><i class="fas fa-calendar-alt"></i> Fecha:</span>
                         <span class="info-value" id="val-date">---</span>
                     </div>
                     <div class="info-item">
-                        <span class="info-label">Moneda:</span>
+                        <span class="info-label"><i class="fas fa-coins"></i> Moneda:</span>
                         <span class="info-value" id="val-currency">---</span>
                     </div>
                     <div class="info-item">
-                        <span class="info-label">Total:</span>
-                        <span class="info-value" id="val-total">---</span>
+                        <span class="info-label"><i class="fas fa-percent"></i> Impuestos:</span>
+                        <span class="info-value" id="val-tax">---</span>
                     </div>
-                    <p style="margin-top: 1rem; font-size: 0.8rem; color: var(--text-muted);">Texto Bruto:</p>
+                    <div class="info-item">
+                        <span class="info-label"><i class="fas fa-receipt"></i> Total:</span>
+                        <span class="info-value highlight" id="val-total">---</span>
+                    </div>
+                    <p style="margin-top: 1rem; font-size: 0.8rem; color: var(--text-muted);">Texto Bruto (OCR):</p>
                     <pre id="text-raw"></pre>
                 </div>
             </div>
@@ -84,7 +102,7 @@
     </div>
 
     <footer>
-        <p>&copy; 2026 Visual Computing Group - Avance de Proyecto Final</p>
+        <p>&copy; 2026 Visual Computing Group - Proyecto Final</p>
         <p>OpenCV Perspective Warp + EasyOCR (PyTorch Engine)</p>
     </footer>
 

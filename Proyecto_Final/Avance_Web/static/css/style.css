@@ -195,6 +195,31 @@ pre {
     to { transform: rotate(360deg); }
 }
 
+.camera-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-top: 1rem;
+    padding: 0.6rem 1.4rem;
+    background: transparent;
+    border: 1px solid var(--glass-border);
+    border-radius: 8px;
+    color: var(--text-muted);
+    font-size: 0.9rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+.camera-btn:hover {
+    border-color: var(--primary);
+    color: var(--primary);
+    background: rgba(99, 102, 241, 0.06);
+}
+
+.info-value.highlight {
+    font-size: 1.1rem;
+    color: #fbbf24;
+}
+
 footer {
     text-align: center;
     padding: 3rem;
