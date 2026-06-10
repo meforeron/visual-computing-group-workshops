@@ -372,78 +372,105 @@
     Chart.defaults.color = '#94a3b8';
     Chart.defaults.borderColor = 'rgba(255,255,255,0.07)';
 
-    /* ── helpers ──────────────────────────────────────────────────── */
+    /* ── Conversion rate (solo para gráficas) ─────────────────────── */
+    const USD_TO_COP = 3600;  // 1 USD = 3600 COP — solo visual en gráficas
+
+    /* ── Helpers ──────────────────────────────────────────────────── */
     function parseNum(s) {
         try { return parseFloat((s || '').replace(/[^\d.]/g, '')) || 0; }
         catch(e) { return 0; }
     }
 
-    /* ── 1. Tax Donut ─────────────────────────────────────────────── */
-    const taxByCurrency = {};
-    invoices.forEach(inv => {
-        const taxVal = parseNum(inv.tax);
-        if (taxVal <= 0) return;
-        const cur = (inv.currency || 'Otro').toUpperCase();
-        taxByCurrency[cur] = (taxByCurrency[cur] || 0) + taxVal;
-    });
-
-    const taxLabels = Object.keys(taxByCurrency);
-    const taxData   = Object.values(taxByCurrency);
-
-    const DONUT_COLORS = {
-        COP: { bg: 'rgba(245,158,11,0.75)',  border: '#f59e0b' },
-        USD: { bg: 'rgba(34,197,94,0.75)',   border: '#22c55e' },
-        EUR: { bg: 'rgba(99,102,241,0.75)', border: '#6366f1' },
-    };
-    function donutColor(label, prop) {
-        return (DONUT_COLORS[label] || { bg:'rgba(148,163,184,0.6)', border:'#94a3b8' })[prop];
+    function toCOP(amount, currency) {
+        return (currency || '').toUpperCase() === 'USD' ? amount * USD_TO_COP : amount;
     }
 
-    if (taxLabels.length > 0) {
+    function fmtCOP(val) {
+        return '$' + Math.round(val).toLocaleString('es-CO');
+    }
+
+    /* ── 1. Tax Donut — proporcional COP vs USD convertido ─────────── */
+    let taxCOP = 0, taxUSD_asCOP = 0;
+    invoices.forEach(inv => {
+        const tv = parseNum(inv.tax);
+        if (tv <= 0) return;
+        if ((inv.currency || '').toUpperCase() === 'USD') taxUSD_asCOP += tv * USD_TO_COP;
+        else taxCOP += tv;
+    });
+
+    const taxHasData = (taxCOP + taxUSD_asCOP) > 0;
+
+    if (taxHasData) {
+        // Build segments: only include non-zero slices
+        const donutLabels = [], donutData = [], donutBg = [], donutBorder = [];
+        if (taxCOP > 0) {
+            donutLabels.push('IVA COP');
+            donutData.push(taxCOP);
+            donutBg.push('rgba(245,158,11,0.8)');
+            donutBorder.push('#f59e0b');
+        }
+        if (taxUSD_asCOP > 0) {
+            donutLabels.push('IVA USD (×' + USD_TO_COP.toLocaleString() + ')');
+            donutData.push(taxUSD_asCOP);
+            donutBg.push('rgba(34,197,94,0.8)');
+            donutBorder.push('#22c55e');
+        }
+
         const ctxTax = document.getElementById('taxChart').getContext('2d');
         new Chart(ctxTax, {
             type: 'doughnut',
             data: {
-                labels: taxLabels,
+                labels: donutLabels,
                 datasets: [{
-                    data: taxData,
-                    backgroundColor: taxLabels.map(l => donutColor(l, 'bg')),
-                    borderColor:     taxLabels.map(l => donutColor(l, 'border')),
+                    data: donutData,
+                    backgroundColor: donutBg,
+                    borderColor:     donutBorder,
                     borderWidth: 2,
-                    hoverOffset: 10,
+                    hoverOffset: 12,
                 }]
             },
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
-                cutout: '68%',
+                cutout: '65%',
                 plugins: {
                     legend: {
-                        position: 'right',
-                        labels: { padding: 14, font: { size: 12 }, boxWidth: 14, borderRadius: 4 }
+                        position: 'bottom',
+                        labels: { padding: 12, font: { size: 11 }, boxWidth: 12, borderRadius: 4 }
                     },
                     tooltip: {
                         callbacks: {
-                            label: ctx => ` ${ctx.label}: ${ctx.formattedValue}`
+                            label: ctx => {
+                                const pct = ((ctx.raw / donutData.reduce((a,b)=>a+b,0))*100).toFixed(1);
+                                return ` ${fmtCOP(ctx.raw)} COP (${pct}%)`;
+                            }
                         }
                     }
                 }
             }
         });
 
-        // Pills summary
+        // Pills
         const pillsEl = document.getElementById('taxPills');
-        taxLabels.forEach((label, i) => {
-            const pill = document.createElement('span');
-            pill.style.cssText = `padding:0.2rem 0.6rem;border-radius:999px;background:${donutColor(label,'bg')};
-                color:#fff;font-weight:600;font-size:0.75rem;`;
-            pill.textContent = `${label}: ${taxData[i].toLocaleString('es-CO', {maximumFractionDigits:2})}`;
-            pillsEl.appendChild(pill);
-        });
+        const total = taxCOP + taxUSD_asCOP;
+        pillsEl.innerHTML = `
+            <span style="padding:0.2rem 0.7rem;border-radius:999px;
+                background:rgba(34,197,94,0.15);color:#4ade80;
+                border:1px solid rgba(34,197,94,0.35);font-weight:700;font-size:0.8rem;">
+                Total: ${fmtCOP(total)} COP
+            </span>
+            <span style="padding:0.2rem 0.7rem;border-radius:999px;
+                background:rgba(255,255,255,0.04);color:var(--text-dim);
+                border:1px solid var(--glass-border);font-size:0.72rem;">
+                USD ×${USD_TO_COP.toLocaleString()} COP
+            </span>`;
     } else {
         document.getElementById('taxChart').style.display = 'none';
         document.getElementById('taxEmpty').style.display = 'block';
     }
+
+
+
 
     /* ── 2. Monthly Spending Bar ──────────────────────────────────── */
     // Regex patterns to extract a parseable date from various formats
@@ -478,59 +505,76 @@
 
     const MONTH_LABELS = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
 
-    const monthlyTotals = {}; // key: "YYYY-MM" → { label, total, cop, usd }
+    // Accumulate everything in COP equivalent (USD × USD_TO_COP)
+    const monthlyTotals = {}; // key: "YYYY-MM" → { label, totalCOP }
     invoices.forEach(inv => {
         const parsed = parseInvoiceDate(inv.date);
         if (!parsed) return;
         const key   = `${parsed.year}-${String(parsed.month).padStart(2,'0')}`;
         const label = `${MONTH_LABELS[parsed.month-1]} ${parsed.year}`;
-        const val   = parseNum(inv.total);
-        const cur   = (inv.currency || '').toUpperCase();
-        if (!monthlyTotals[key]) monthlyTotals[key] = { label, cop: 0, usd: 0, other: 0 };
-        if (cur === 'COP') monthlyTotals[key].cop   += val;
-        else if (cur === 'USD') monthlyTotals[key].usd += val;
-        else monthlyTotals[key].other += val;
+        const val   = toCOP(parseNum(inv.total), inv.currency);
+        if (!monthlyTotals[key]) monthlyTotals[key] = { label, totalCOP: 0 };
+        monthlyTotals[key].totalCOP += val;
     });
 
     const sortedMonths = Object.keys(monthlyTotals).sort();
 
     if (sortedMonths.length > 0) {
         document.getElementById('monthlyEmpty').style.display = 'none';
-        const mLabels   = sortedMonths.map(k => monthlyTotals[k].label);
-        const mCOP      = sortedMonths.map(k => monthlyTotals[k].cop);
-        const mUSD      = sortedMonths.map(k => monthlyTotals[k].usd);
-        const mOther    = sortedMonths.map(k => monthlyTotals[k].other);
-
-        const hasCOP    = mCOP.some(v => v > 0);
-        const hasUSD    = mUSD.some(v => v > 0);
-        const hasOther  = mOther.some(v => v > 0);
-
-        const datasets = [];
-        if (hasCOP)   datasets.push({ label:'COP', data:mCOP,   backgroundColor:'rgba(245,158,11,0.7)', borderColor:'#f59e0b', borderWidth:2, borderRadius:6 });
-        if (hasUSD)   datasets.push({ label:'USD', data:mUSD,   backgroundColor:'rgba(34,197,94,0.7)',  borderColor:'#22c55e', borderWidth:2, borderRadius:6 });
-        if (hasOther) datasets.push({ label:'Otro',data:mOther, backgroundColor:'rgba(99,102,241,0.7)',borderColor:'#6366f1', borderWidth:2, borderRadius:6 });
+        const mLabels = sortedMonths.map(k => monthlyTotals[k].label);
+        const mData   = sortedMonths.map(k => Math.round(monthlyTotals[k].totalCOP));
 
         const ctxMonthly = document.getElementById('monthlyChart').getContext('2d');
         new Chart(ctxMonthly, {
             type: 'bar',
-            data: { labels: mLabels, datasets },
+            data: {
+                labels: mLabels,
+                datasets: [{
+                    label: 'Total (COP)',
+                    data: mData,
+                    backgroundColor: 'rgba(34,197,94,0.7)',
+                    borderColor: '#22c55e',
+                    borderWidth: 2,
+                    borderRadius: 6,
+                }]
+            },
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
                 plugins: {
-                    legend: { display: datasets.length > 1 }
+                    legend: { display: false },
+                    tooltip: {
+                        callbacks: {
+                            label: ctx => ' ' + fmtCOP(ctx.raw) + ' COP'
+                        }
+                    }
                 },
                 scales: {
-                    x: { stacked: false },
-                    y: { beginAtZero: true, stacked: false }
+                    x: { grid: { display: false } },
+                    y: {
+                        beginAtZero: true,
+                        ticks: {
+                            callback: val => '$' + (val >= 1_000_000
+                                ? (val/1_000_000).toFixed(1) + 'M'
+                                : val >= 1000 ? (val/1000).toFixed(0) + 'K' : val)
+                        }
+                    }
                 }
             }
         });
+
+        // Add conversion note to subtitle
+        const note = document.createElement('span');
+        note.style.cssText = 'font-size:0.72rem;color:var(--text-dim);margin-left:0.5rem;';
+        note.textContent = `· USD convertido a COP ×${USD_TO_COP.toLocaleString()}`;
+        document.querySelector('#monthlyChart').closest('.chart-container').querySelector('p').appendChild(note);
+
     } else {
         document.getElementById('monthlyChart').style.display = 'none';
         const emptyEl = document.getElementById('monthlyEmpty');
         emptyEl.style.display = 'flex';
     }
+
 </script>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
