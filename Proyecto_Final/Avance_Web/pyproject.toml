@@ -1,0 +1,13 @@
+[project]
+name = "smartinvoice"
+version = "0.1.0"
+requires-python = ">=3.10"
+dependencies = [
+    "flask>=3.0",
+    "opencv-python>=4.8",
+    "easyocr>=1.7",
+    "numpy>=1.24",
+    "werkzeug>=3.0",
+    "torch>=2.0",
+]
+
