@@ -109,7 +109,32 @@
             font-size: 0.82rem;
             transition: all 0.2s ease;
         }
-        .btn-view:hover { background: var(--primary); color: white; }
+        .btn-delete {
+            background: rgba(239,68,68,0.1);
+            color: #f87171;
+            border: 1px solid rgba(239,68,68,0.25);
+            padding: 0.3rem 0.7rem;
+            border-radius: 8px;
+            font-size: 0.82rem;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            margin-left: 0.4rem;
+        }
+        .btn-delete:hover {
+            background: rgba(239,68,68,0.85);
+            color: white;
+            border-color: transparent;
+        }
+        .btn-delete.confirm {
+            background: #ef4444;
+            color: white;
+            border-color: transparent;
+            animation: pulse-red 0.6s ease infinite alternate;
+        }
+        @keyframes pulse-red {
+            from { box-shadow: 0 0 0 0 rgba(239,68,68,0.4); }
+            to   { box-shadow: 0 0 0 6px rgba(239,68,68,0); }
+        }
         .divider-currency {
             display: flex;
             align-items: center;
@@ -347,7 +372,7 @@
                                 <span style="color:var(--accent);">${{ inv.total }}</span>
                             {% endif %}
                         </td>
-                        <td class="text-end">
+                        <td class="text-end" style="white-space:nowrap;">
                             {% if inv.image_path %}
                                 <a href="{{ inv.image_path }}" target="_blank" class="btn-view">
                                     <i class="fas fa-eye me-1"></i> Ver
@@ -355,6 +380,13 @@
                             {% else %}
                                 <span class="text-muted" style="font-size:0.8rem;">Sin imagen</span>
                             {% endif %}
+                            <button
+                                class="btn-delete"
+                                data-id="{{ inv.id }}"
+                                onclick="deleteInvoice(this)"
+                                title="Eliminar factura">
+                                <i class="fas fa-trash-alt"></i>
+                            </button>
                         </td>
                     </tr>
                     {% else %}
@@ -573,6 +605,54 @@
         document.getElementById('monthlyChart').style.display = 'none';
         const emptyEl = document.getElementById('monthlyEmpty');
         emptyEl.style.display = 'flex';
+    }
+
+    /* ── Delete invoice ───────────────────────────────────────────── */
+    let _deleteTimer = null;
+
+    function deleteInvoice(btn) {
+        const id = btn.dataset.id;
+
+        // First click → arm (ask for confirmation)
+        if (!btn.classList.contains('confirm')) {
+            btn.classList.add('confirm');
+            btn.innerHTML = '<i class="fas fa-exclamation-triangle me-1"></i> ¿Seguro?';
+            // Auto-disarm after 3 s
+            _deleteTimer = setTimeout(() => {
+                btn.classList.remove('confirm');
+                btn.innerHTML = '<i class="fas fa-trash-alt"></i>';
+            }, 3000);
+            return;
+        }
+
+        // Second click → delete
+        clearTimeout(_deleteTimer);
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+
+        fetch(`/invoice/delete/${id}`, { method: 'POST' })
+            .then(r => r.json())
+            .then(data => {
+                if (data.ok) {
+                    // Fade row out
+                    const row = btn.closest('tr');
+                    row.style.transition = 'opacity 0.35s ease, transform 0.35s ease';
+                    row.style.opacity = '0';
+                    row.style.transform = 'translateX(20px)';
+                    setTimeout(() => row.remove(), 360);
+                } else {
+                    alert(data.error || 'Error al eliminar');
+                    btn.disabled = false;
+                    btn.classList.remove('confirm');
+                    btn.innerHTML = '<i class="fas fa-trash-alt"></i>';
+                }
+            })
+            .catch(() => {
+                alert('Error de conexión');
+                btn.disabled = false;
+                btn.classList.remove('confirm');
+                btn.innerHTML = '<i class="fas fa-trash-alt"></i>';
+            });
     }
 
 </script>

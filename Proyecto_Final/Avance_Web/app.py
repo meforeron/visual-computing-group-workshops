@@ -613,6 +613,7 @@ def dashboard():
     invoices = Invoice.query.filter_by(user_id=current_user.id).order_by(Invoice.created_at.desc()).all()
 
     invoices_list = [{
+        'id':       inv.id,
         'commerce': inv.commerce or 'Desconocido',
         'date':     inv.date     or 'Sin fecha',
         'currency': inv.currency or 'COP',
@@ -645,6 +646,29 @@ def dashboard():
         total_other=round(total_other, 2),
         deleted_count=deleted,
     )
+
+
+@app.route('/invoice/delete/<int:invoice_id>', methods=['POST'])
+@login_required
+def delete_invoice(invoice_id):
+    """Delete an invoice and its associated image file (owner-only)."""
+    inv = Invoice.query.get_or_404(invoice_id)
+    if inv.user_id != current_user.id:
+        return jsonify({'error': 'No autorizado'}), 403
+
+    # Remove the scanned image from disk (best-effort)
+    if inv.image_path:
+        # image_path is like "/static/uploads/filename.jpg"
+        disk_path = os.path.join(os.path.dirname(__file__), inv.image_path.lstrip('/'))
+        try:
+            if os.path.isfile(disk_path):
+                os.remove(disk_path)
+        except OSError:
+            pass
+
+    db.session.delete(inv)
+    db.session.commit()
+    return jsonify({'ok': True, 'id': invoice_id})
 
 
 @app.route('/upload', methods=['POST'])
