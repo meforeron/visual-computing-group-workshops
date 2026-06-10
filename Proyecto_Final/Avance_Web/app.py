@@ -622,19 +622,30 @@ def dashboard():
         'created_at': inv.created_at.strftime('%Y-%m-%d %H:%M:%S')
     } for inv in invoices]
 
-    total_cop   = 0.0
-    total_usd   = 0.0
-    total_other = 0.0
+    total_cop  = 0.0;  count_cop = 0
+    total_usd  = 0.0;  count_usd = 0
+    extras: dict = {}  # { 'EUR': {'total': 0.0, 'count': 0} }
 
     for inv in invoices:
         amount   = _parse_amount(inv.total)
         currency = (inv.currency or '').strip().lower()
         if currency in _COP_CURRENCIES:
-            total_cop   += amount
+            total_cop += amount;  count_cop += 1
         elif currency in _USD_CURRENCIES:
-            total_usd   += amount
+            total_usd += amount;  count_usd += 1
         else:
-            total_other += amount
+            # Normalize key to uppercase display label
+            key = (inv.currency or 'Otra').strip().upper()
+            if key not in extras:
+                extras[key] = {'total': 0.0, 'count': 0}
+            extras[key]['total'] += amount
+            extras[key]['count'] += 1
+
+    # Serialize extras as a JSON-safe list for the template
+    extra_currencies = [
+        {'currency': k, 'total': round(v['total'], 2), 'count': v['count']}
+        for k, v in extras.items()
+    ]
 
     return render_template(
         'dashboard.html',
@@ -642,8 +653,10 @@ def dashboard():
         invoices_json=json.dumps(invoices_list),
         total_count=len(invoices),
         total_cop=round(total_cop, 2),
+        count_cop=count_cop,
         total_usd=round(total_usd, 2),
-        total_other=round(total_other, 2),
+        count_usd=count_usd,
+        extra_currencies=extra_currencies,
         deleted_count=deleted,
     )
 
