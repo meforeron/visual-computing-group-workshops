@@ -40,7 +40,10 @@
         <div class="results-grid" id="results-container">
             <!-- Original -->
             <div class="card">
-                <div class="card-header">Imagen Original</div>
+                <div class="card-header">
+                    <span class="step-badge step-1">1</span>
+                    Captura Original
+                </div>
                 <div class="image-container">
                     <img id="img-original" src="" alt="Original">
                 </div>
@@ -48,7 +51,10 @@
 
             <!-- Edges -->
             <div class="card">
-                <div class="card-header">Detección de Bordes (Canny)</div>
+                <div class="card-header">
+                    <span class="step-badge step-2">2</span>
+                    Bordes Canny
+                </div>
                 <div class="image-container">
                     <img id="img-edge" src="" alt="Edges">
                 </div>
@@ -56,7 +62,10 @@
 
             <!-- Smart Scan -->
             <div class="card">
-                <div class="card-header">Escaneo Pro (Perspectiva)</div>
+                <div class="card-header">
+                    <span class="step-badge step-3">3</span>
+                    Corrección Perspectiva
+                </div>
                 <div class="image-container">
                     <img id="img-scan" src="" alt="Scan">
                 </div>
@@ -64,7 +73,10 @@
 
             <!-- Detections -->
             <div class="card">
-                <div class="card-header">OCR Detecciones (EasyOCR)</div>
+                <div class="card-header">
+                    <span class="step-badge step-4">4</span>
+                    OCR (EasyOCR)
+                </div>
                 <div class="image-container">
                     <img id="img-detection" src="" alt="Detection">
                 </div>
@@ -72,8 +84,16 @@
 
             <!-- Datos Extraidos -->
             <div class="card" style="grid-column: span 1;">
-                <div class="card-header">Información Extraída</div>
+                <div class="card-header">
+                    <i class="fas fa-table" style="margin-right: 0.4rem;"></i>
+                    Información Extraída
+                    <span class="conf-badge" id="conf-badge" title="Confianza promedio del OCR"></span>
+                </div>
                 <div class="data-output">
+                    <div class="ocr-stats" id="ocr-stats">
+                        <span id="stat-blocks"></span>
+                        <span id="stat-conf"></span>
+                    </div>
                     <div class="info-item">
                         <span class="info-label"><i class="fas fa-store"></i> Comercio:</span>
                         <span class="info-value" id="val-merchant">---</span>
@@ -94,6 +114,9 @@
                         <span class="info-label"><i class="fas fa-receipt"></i> Total:</span>
                         <span class="info-value highlight" id="val-total">---</span>
                     </div>
+                    <button id="export-csv" class="export-btn" title="Descargar campos en CSV">
+                        <i class="fas fa-file-csv"></i> Exportar CSV
+                    </button>
                     <p style="margin-top: 1rem; font-size: 0.8rem; color: var(--text-muted);">Texto Bruto (OCR):</p>
                     <pre id="text-raw"></pre>
                 </div>

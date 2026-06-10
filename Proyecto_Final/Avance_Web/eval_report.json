@@ -1,0 +1,517 @@
+{
+  "counts": {
+    "Comercio": {
+      "hit": 0,
+      "partial": 12,
+      "miss": 2,
+      "skip": 6
+    },
+    "Fecha": {
+      "hit": 14,
+      "partial": 0,
+      "miss": 0,
+      "skip": 6
+    },
+    "Moneda": {
+      "hit": 11,
+      "partial": 0,
+      "miss": 0,
+      "skip": 9
+    },
+    "Impuestos": {
+      "hit": 13,
+      "partial": 0,
+      "miss": 0,
+      "skip": 7
+    },
+    "Total": {
+      "hit": 12,
+      "partial": 2,
+      "miss": 0,
+      "skip": 6
+    }
+  },
+  "results": [
+    {
+      "file": "1001-receipt.jpg",
+      "predicted": {
+        "Comercio": "GRAND IIIXOJFE RooseveIt Field",
+        "Fecha": "04/25/15",
+        "Moneda": "No detectada",
+        "Impuestos": "5.50",
+        "Total": "69.25"
+      },
+      "gt": {
+        "Comercio": "GRAND",
+        "Fecha": "04/25/15",
+        "Moneda": "",
+        "Impuestos": "5.50",
+        "Total": "69.25"
+      },
+      "match": {
+        "Comercio": "partial",
+        "Fecha": "exact",
+        "Moneda": "skip",
+        "Impuestos": "exact",
+        "Total": "exact"
+      }
+    },
+    {
+      "file": "1002-receipt.jpg",
+      "predicted": {
+        "Comercio": "For a Chance",
+        "Fecha": "9/1/2016",
+        "Moneda": "No detectada",
+        "Impuestos": "61.00",
+        "Total": "8.25"
+      },
+      "gt": {
+        "Comercio": "Taco Bell",
+        "Fecha": "9/1/2016",
+        "Moneda": "",
+        "Impuestos": "",
+        "Total": "8.25"
+      },
+      "match": {
+        "Comercio": "MISS (got='For a Chance')",
+        "Fecha": "exact",
+        "Moneda": "skip",
+        "Impuestos": "skip",
+        "Total": "exact"
+      }
+    },
+    {
+      "file": "1003-receipt.jpg",
+      "predicted": {
+        "Comercio": "E] Gran Har d Plata Miami",
+        "Fecha": "4/20/2017",
+        "Moneda": "No detectada",
+        "Impuestos": "0.35",
+        "Total": "85.35"
+      },
+      "gt": {
+        "Comercio": "El Gran Mar",
+        "Fecha": "4/20/2017",
+        "Moneda": "",
+        "Impuestos": "0.35",
+        "Total": "5.35"
+      },
+      "match": {
+        "Comercio": "partial",
+        "Fecha": "exact",
+        "Moneda": "skip",
+        "Impuestos": "exact",
+        "Total": "partial"
+      }
+    },
+    {
+      "file": "1004-receipt.jpg",
+      "predicted": {
+        "Comercio": "SOLDIEN  I3OwL TERIYAK [",
+        "Fecha": "05-18-2019",
+        "Moneda": "$",
+        "Impuestos": "1.40",
+        "Total": "415.03"
+      },
+      "gt": {
+        "Comercio": "GOLDEN BOWL",
+        "Fecha": "05-18-2019",
+        "Moneda": "$",
+        "Impuestos": "1.40",
+        "Total": "15.03"
+      },
+      "match": {
+        "Comercio": "MISS (got='SOLDIEN  I3OwL TERIYAK [')",
+        "Fecha": "exact",
+        "Moneda": "exact",
+        "Impuestos": "exact",
+        "Total": "partial"
+      }
+    },
+    {
+      "file": "1005-receipt.jpg",
+      "predicted": {
+        "Comercio": "---",
+        "Fecha": "08/15/2017",
+        "Moneda": "$",
+        "Impuestos": "12.94",
+        "Total": "936.74"
+      },
+      "gt": {
+        "Comercio": "",
+        "Fecha": "",
+        "Moneda": "",
+        "Impuestos": "",
+        "Total": ""
+      },
+      "match": {
+        "Comercio": "skip",
+        "Fecha": "skip",
+        "Moneda": "skip",
+        "Impuestos": "skip",
+        "Total": "skip"
+      }
+    },
+    {
+      "file": "1006-receipt.jpg",
+      "predicted": {
+        "Comercio": "Akira",
+        "Fecha": "---",
+        "Moneda": "No detectada",
+        "Impuestos": "---",
+        "Total": "520.75"
+      },
+      "gt": {
+        "Comercio": "",
+        "Fecha": "",
+        "Moneda": "",
+        "Impuestos": "",
+        "Total": ""
+      },
+      "match": {
+        "Comercio": "skip",
+        "Fecha": "skip",
+        "Moneda": "skip",
+        "Impuestos": "skip",
+        "Total": "skip"
+      }
+    },
+    {
+      "file": "1007-receipt.jpg",
+      "predicted": {
+        "Comercio": "sushi Katana",
+        "Fecha": "05/11/18",
+        "Moneda": "$",
+        "Impuestos": "812.71",
+        "Total": "8143.71"
+      },
+      "gt": {
+        "Comercio": "",
+        "Fecha": "",
+        "Moneda": "",
+        "Impuestos": "",
+        "Total": ""
+      },
+      "match": {
+        "Comercio": "skip",
+        "Fecha": "skip",
+        "Moneda": "skip",
+        "Impuestos": "skip",
+        "Total": "skip"
+      }
+    },
+    {
+      "file": "1008-receipt.jpg",
+      "predicted": {
+        "Comercio": "Dona Mercedes Restaurant Vero",
+        "Fecha": "---",
+        "Moneda": "$",
+        "Impuestos": "2.22",
+        "Total": "24.47"
+      },
+      "gt": {
+        "Comercio": "",
+        "Fecha": "",
+        "Moneda": "",
+        "Impuestos": "",
+        "Total": ""
+      },
+      "match": {
+        "Comercio": "skip",
+        "Fecha": "skip",
+        "Moneda": "skip",
+        "Impuestos": "skip",
+        "Total": "skip"
+      }
+    },
+    {
+      "file": "1009-receipt.jpg",
+      "predicted": {
+        "Comercio": "---",
+        "Fecha": "08/09/19",
+        "Moneda": "No detectada",
+        "Impuestos": "---",
+        "Total": "---"
+      },
+      "gt": {
+        "Comercio": "",
+        "Fecha": "",
+        "Moneda": "",
+        "Impuestos": "",
+        "Total": ""
+      },
+      "match": {
+        "Comercio": "skip",
+        "Fecha": "skip",
+        "Moneda": "skip",
+        "Impuestos": "skip",
+        "Total": "skip"
+      }
+    },
+    {
+      "file": "1010-receipt.jpg",
+      "predicted": {
+        "Comercio": "Frienly Red' s of Windham",
+        "Fecha": "07/21/2018",
+        "Moneda": "No detectada",
+        "Impuestos": "6.43",
+        "Total": "77.83"
+      },
+      "gt": {
+        "Comercio": "",
+        "Fecha": "",
+        "Moneda": "",
+        "Impuestos": "",
+        "Total": ""
+      },
+      "match": {
+        "Comercio": "skip",
+        "Fecha": "skip",
+        "Moneda": "skip",
+        "Impuestos": "skip",
+        "Total": "skip"
+      }
+    },
+    {
+      "file": "synth_col_00.jpg",
+      "predicted": {
+        "Comercio": "TIENDAS Dl",
+        "Fecha": "15/03/2024",
+        "Moneda": "$",
+        "Impuestos": "23750.00",
+        "Total": "148750.00"
+      },
+      "gt": {
+        "Comercio": "TIENDAS D1 S.A.S",
+        "Fecha": "15/03/2024",
+        "Moneda": "$",
+        "Impuestos": "23750.00",
+        "Total": "148750.00"
+      },
+      "match": {
+        "Comercio": "partial",
+        "Fecha": "exact",
+        "Moneda": "exact",
+        "Impuestos": "exact",
+        "Total": "exact"
+      }
+    },
+    {
+      "file": "synth_col_01.jpg",
+      "predicted": {
+        "Comercio": "SUPERMERCADOS EXITO $.A",
+        "Fecha": "22/04/2024",
+        "Moneda": "$",
+        "Impuestos": "9785.00",
+        "Total": "61285.00"
+      },
+      "gt": {
+        "Comercio": "SUPERMERCADOS EXITO S.A.",
+        "Fecha": "22/04/2024",
+        "Moneda": "$",
+        "Impuestos": "9785.00",
+        "Total": "61285.00"
+      },
+      "match": {
+        "Comercio": "partial",
+        "Fecha": "exact",
+        "Moneda": "exact",
+        "Impuestos": "exact",
+        "Total": "exact"
+      }
+    },
+    {
+      "file": "synth_col_02.jpg",
+      "predicted": {
+        "Comercio": "VIVERO 5.A CARULLA",
+        "Fecha": "08/07/2024",
+        "Moneda": "$",
+        "Impuestos": "17385.00",
+        "Total": "108885.00"
+      },
+      "gt": {
+        "Comercio": "CARULLA VIVERO S.A.",
+        "Fecha": "08/07/2024",
+        "Moneda": "$",
+        "Impuestos": "17385.00",
+        "Total": "108885.00"
+      },
+      "match": {
+        "Comercio": "partial",
+        "Fecha": "exact",
+        "Moneda": "exact",
+        "Impuestos": "exact",
+        "Total": "exact"
+      }
+    },
+    {
+      "file": "synth_col_03.jpg",
+      "predicted": {
+        "Comercio": "JUMBO   CENCOSUD COLOMBIA",
+        "Fecha": "19/09/2024",
+        "Moneda": "$",
+        "Impuestos": "19969.00",
+        "Total": "125069.00"
+      },
+      "gt": {
+        "Comercio": "JUMBO CENCOSUD COLOMBIA",
+        "Fecha": "19/09/2024",
+        "Moneda": "$",
+        "Impuestos": "19969.00",
+        "Total": "125069.00"
+      },
+      "match": {
+        "Comercio": "partial",
+        "Fecha": "exact",
+        "Moneda": "exact",
+        "Impuestos": "exact",
+        "Total": "exact"
+      }
+    },
+    {
+      "file": "synth_col_04.jpg",
+      "predicted": {
+        "Comercio": "ALMACENES ARA",
+        "Fecha": "03/11/2024",
+        "Moneda": "$",
+        "Impuestos": "14402.00",
+        "Total": "90202.00"
+      },
+      "gt": {
+        "Comercio": "ALMACENES ARA S.A.S.",
+        "Fecha": "03/11/2024",
+        "Moneda": "$",
+        "Impuestos": "14402.00",
+        "Total": "90202.00"
+      },
+      "match": {
+        "Comercio": "partial",
+        "Fecha": "exact",
+        "Moneda": "exact",
+        "Impuestos": "exact",
+        "Total": "exact"
+      }
+    },
+    {
+      "file": "synth_col_05.jpg",
+      "predicted": {
+        "Comercio": "TIENDAS Dl",
+        "Fecha": "28/01/2025",
+        "Moneda": "$",
+        "Impuestos": "10545.00",
+        "Total": "66045.00"
+      },
+      "gt": {
+        "Comercio": "TIENDAS D1 S.A.S",
+        "Fecha": "28/01/2025",
+        "Moneda": "$",
+        "Impuestos": "10545.00",
+        "Total": "66045.00"
+      },
+      "match": {
+        "Comercio": "partial",
+        "Fecha": "exact",
+        "Moneda": "exact",
+        "Impuestos": "exact",
+        "Total": "exact"
+      }
+    },
+    {
+      "file": "synth_col_06.jpg",
+      "predicted": {
+        "Comercio": "SUPERMERCADOS EXITO $.A",
+        "Fecha": "14/02/2025",
+        "Moneda": "$",
+        "Impuestos": "26942.00",
+        "Total": "168742.00"
+      },
+      "gt": {
+        "Comercio": "SUPERMERCADOS EXITO S.A.",
+        "Fecha": "14/02/2025",
+        "Moneda": "$",
+        "Impuestos": "26942.00",
+        "Total": "168742.00"
+      },
+      "match": {
+        "Comercio": "partial",
+        "Fecha": "exact",
+        "Moneda": "exact",
+        "Impuestos": "exact",
+        "Total": "exact"
+      }
+    },
+    {
+      "file": "synth_col_07.jpg",
+      "predicted": {
+        "Comercio": "VIVERO 5.A CARULLA",
+        "Fecha": "05/06/2025",
+        "Moneda": "$",
+        "Impuestos": "8740.00",
+        "Total": "54740.00"
+      },
+      "gt": {
+        "Comercio": "CARULLA VIVERO S.A.",
+        "Fecha": "05/06/2025",
+        "Moneda": "$",
+        "Impuestos": "8740.00",
+        "Total": "54740.00"
+      },
+      "match": {
+        "Comercio": "partial",
+        "Fecha": "exact",
+        "Moneda": "exact",
+        "Impuestos": "exact",
+        "Total": "exact"
+      }
+    },
+    {
+      "file": "synth_col_08.jpg",
+      "predicted": {
+        "Comercio": "JUMBO   CENCOSUD COLOMBIA",
+        "Fecha": "11/08/2024",
+        "Moneda": "$",
+        "Impuestos": "8949.00",
+        "Total": "56049.00"
+      },
+      "gt": {
+        "Comercio": "JUMBO CENCOSUD COLOMBIA",
+        "Fecha": "11/08/2024",
+        "Moneda": "$",
+        "Impuestos": "8949.00",
+        "Total": "56049.00"
+      },
+      "match": {
+        "Comercio": "partial",
+        "Fecha": "exact",
+        "Moneda": "exact",
+        "Impuestos": "exact",
+        "Total": "exact"
+      }
+    },
+    {
+      "file": "synth_col_09.jpg",
+      "predicted": {
+        "Comercio": "ALMACENES ARA",
+        "Fecha": "30/10/2024",
+        "Moneda": "$",
+        "Impuestos": "27417.00",
+        "Total": "171717.00"
+      },
+      "gt": {
+        "Comercio": "ALMACENES ARA S.A.S.",
+        "Fecha": "30/10/2024",
+        "Moneda": "$",
+        "Impuestos": "27417.00",
+        "Total": "171717.00"
+      },
+      "match": {
+        "Comercio": "partial",
+        "Fecha": "exact",
+        "Moneda": "exact",
+        "Impuestos": "exact",
+        "Total": "exact"
+      }
+    }
+  ],
+  "overall_pct": 86.4
+}

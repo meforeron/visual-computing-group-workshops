@@ -19,7 +19,13 @@ document.addEventListener('DOMContentLoaded', () => {
         tax:       document.getElementById('val-tax'),
         total:     document.getElementById('val-total'),
         raw:       document.getElementById('text-raw'),
+        confBadge: document.getElementById('conf-badge'),
+        statBlocks: document.getElementById('stat-blocks'),
+        statConf:   document.getElementById('stat-conf'),
     };
+
+    const exportBtn = document.getElementById('export-csv');
+    let lastInfo = null;
 
     // --- File input (drop-zone click) ---
     dropZone.addEventListener('click', (e) => {
@@ -49,6 +55,25 @@ document.addEventListener('DOMContentLoaded', () => {
         if (e.dataTransfer.files.length > 0) uploadFile(e.dataTransfer.files[0]);
     });
 
+    // --- CSV export (2.6) ---
+    function csvEscape(v) {
+        const s = (v ?? '').toString();
+        return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+    }
+    exportBtn.addEventListener('click', () => {
+        if (!lastInfo) return;
+        const cols = ['Comercio', 'Fecha', 'Moneda', 'Impuestos', 'Total'];
+        const header = cols.join(',');
+        const row = cols.map((c) => csvEscape(lastInfo[c] || '')).join(',');
+        const blob = new Blob(['﻿' + header + '\n' + row + '\n'], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `factura_${Date.now()}.csv`;
+        a.click();
+        URL.revokeObjectURL(url);
+    });
+
     // --- Helpers ---
     function showError(msg) {
         errorMsg.textContent = msg;
@@ -67,6 +92,9 @@ document.addEventListener('DOMContentLoaded', () => {
     function uploadFile(file) {
         clearError();
         resultsContainer.classList.remove('visible');
+        elements.confBadge.style.display = 'none';
+        elements.statBlocks.innerHTML = '';
+        elements.statConf.innerHTML = '';
         setLoading(true);
 
         const formData = new FormData();
@@ -92,12 +120,26 @@ document.addEventListener('DOMContentLoaded', () => {
                 elements.detection.src = data.images.detection;
 
                 const info = data.parsed_info;
+                lastInfo = info;
                 elements.merchant.textContent = info.Comercio  || '---';
                 elements.date.textContent     = info.Fecha     || '---';
                 elements.currency.textContent = info.Moneda    || '---';
                 elements.tax.textContent      = info.Impuestos || '---';
                 elements.total.textContent    = info.Total     || '---';
                 elements.raw.textContent      = data.text;
+
+                const conf = data.ocr_confidence ?? null;
+                const blocks = data.ocr_blocks ?? null;
+                if (conf !== null) {
+                    const badge = elements.confBadge;
+                    badge.textContent = `OCR ${conf}%`;
+                    badge.className = 'conf-badge ' + (conf >= 75 ? 'conf-high' : conf >= 50 ? 'conf-mid' : 'conf-low');
+                    badge.style.display = 'inline-block';
+                    elements.statConf.innerHTML = `<i class="fas fa-chart-bar"></i> Confianza: <strong>${conf}%</strong>`;
+                }
+                if (blocks !== null) {
+                    elements.statBlocks.innerHTML = `<i class="fas fa-th-large"></i> Bloques OCR: <strong>${blocks}</strong>`;
+                }
 
                 resultsContainer.classList.add('visible');
             })

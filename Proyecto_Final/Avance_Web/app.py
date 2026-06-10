@@ -23,6 +23,9 @@ _MERCHANT_NOISE = [
     r'\b(?:AVE|BLVD|ST|DR|RD|KM|CL|CR|KR|CRA|CALLE|CARRERA|DIAGONAL|TRANSVERSAL)\b',
     r'\b\d{5,}\b',                                # zip / long numbers alone
     r'^[\d\s\W]+$',                               # only digits/punctuation
+    r'\bCOP\b|\bPESOS\b|\bCOLOMBIANOS\b',         # currency label lines
+    r'\bFECHA\b|\bTICKET\b|\bFACTURA\b',         # transaction metadata
+    r'\b(?:Bogota|Medellin|Cali|Barranquilla|Cartagena|Bucaramanga)\b',  # cities
 ]
 
 app = Flask(__name__)
@@ -82,7 +85,13 @@ def normalize_price(raw):
         else:
             # 1,234  →  thousands comma, no decimals
             s = s.replace(',', '')
-    # only dot → already US format; no separator → integer
+    elif has_dot and not has_comma:
+        parts = s.split('.')
+        if len(parts[-1]) == 3:
+            # 148.750 or 1.234.567  →  Colombian thousands separator
+            s = s.replace('.', '')
+        # else: 69.25  →  already US decimal
+    # no separator → integer
     try:
         return f"{float(s):.2f}"
     except ValueError:
@@ -168,17 +177,73 @@ def extract_merchant(results, img_height):
     return " ".join(lines) if lines else "---"
 
 
+def _detect_language(text):
+    """Heuristic language detection from OCR text. Defaults to Spanish."""
+    t = text.lower()
+    es_score = sum(1 for w in [
+        'fecha', 'pagar', 'iva', 'nit', 'factura', 'recibo', 'importe',
+        'enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio',
+        'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre',
+    ] if w in t)
+    en_score = sum(1 for w in [
+        'receipt', 'invoice', 'cashier', 'january', 'february', 'march',
+        'april', 'june', 'july', 'august', 'september', 'october',
+        'november', 'december', 'amount due', 'total due',
+    ] if w in t)
+    return 'en' if en_score > es_score else 'es'
+
+
+def _ocr_fix(n):
+    """If n > 31 (impossible date component), try replacing '8'→'0' (common OCR confusion)."""
+    if n <= 31:
+        return n
+    fixed = int(str(n).replace('8', '0', 1))
+    return fixed if 1 <= fixed <= 31 else n
+
+
 def extract_date(text):
-    patterns = [
-        r'\b\d{1,2}[/\-]\d{1,2}[/\-]\d{2,4}\b',          # 12/03/2024
-        r'\b\d{4}[/\-]\d{1,2}[/\-]\d{1,2}\b',              # 2024-03-12
-        r'\b\d{1,2}\s+de\s+[a-záéíóúñ]+\s+de\s+\d{4}\b',  # 12 de marzo de 2024
+    # Pattern 1: A/B/YYYY — DD/MM/YYYY or MM/DD/YYYY
+    # Rule: if A>12 → day=A; if B>12 → day=B; both ≤12 → language (es=DD/MM, en=MM/DD)
+    for m in re.finditer(r'\b(\d{1,2})([/\-])(\d{1,2})\2(\d{2,4})\b', text):
+        a, sep, b, year = _ocr_fix(int(m.group(1))), m.group(2), _ocr_fix(int(m.group(3))), m.group(4)
+        if a > 31 or b > 31:
+            continue
+        if a > 12:
+            dd, mm = a, b
+        elif b > 12:
+            dd, mm = b, a
+        else:
+            dd, mm = (a, b) if _detect_language(text) == 'es' else (b, a)
+        if 1 <= mm <= 12 and 1 <= dd <= 31:
+            return f"{dd:02d}{sep}{mm:02d}{sep}{year}"
+
+    # Pattern 2: YYYY/A/B — ISO convention A=month, B=day; same disambiguation rule
+    for m in re.finditer(r'\b(\d{4})([/\-])(\d{1,2})\2(\d{1,2})\b', text):
+        year, sep, a, b = m.group(1), m.group(2), _ocr_fix(int(m.group(3))), _ocr_fix(int(m.group(4)))
+        if a > 31 or b > 31:
+            continue
+        if a > 12:
+            dd, mm = a, b       # unusual YYYY/DD/MM
+        elif b > 12:
+            dd, mm = b, a       # standard YYYY/MM/DD
+        else:
+            dd, mm = b, a       # both ≤12: assume ISO YYYY/MM/DD → month=a, day=b
+        if 1 <= mm <= 12 and 1 <= dd <= 31:
+            return f"{dd:02d}{sep}{mm:02d}{sep}{year}"
+
+    # Pattern 3: 12 de marzo de 2024 (Spanish written)
+    m = re.search(r'\b\d{1,2}\s+de\s+[a-záéíóúñ]+\s+de\s+\d{4}\b', text, re.IGNORECASE)
+    if m:
+        return m.group(0)
+
+    # Pattern 4: Mar 12, 2024 (English written)
+    m = re.search(
         r'\b(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\w*[\s.\-,]+\d{1,2}[\s,]+\d{4}\b',
-    ]
-    for p in patterns:
-        m = re.search(p, text, re.IGNORECASE)
-        if m:
-            return m.group(0)
+        text, re.IGNORECASE,
+    )
+    if m:
+        return m.group(0)
+
     return "---"
 
 
@@ -204,7 +269,7 @@ def extract_tax(text):
         r'\bSALES\s+TAX[\s\:$]+([\$€]?\s?[\d.,]+)',
         r'\bTAX\s+AMOUNT[\s\:$]+([\$€]?\s?[\d.,]+)',
         r'\bTAX[\s\:$]+([\$€]?\s?[\d.,]+)',
-        r'\bIVA[\s\:$]+([\$€]?\s?[\d.,]+)',
+        r'\bIVA\s*(?:\([^)]*\))?\s*[\:\s]+([\$€]?\s?[\d.,]+)',  # IVA (19%): $ X
         r'\bI\.V\.A\.[\s\:$]+([\$€]?\s?[\d.,]+)',
         r'\bIMPUESTO[\s\:$]+([\$€]?\s?[\d.,]+)',
         r'\bTRIBUTO[\s\:$]+([\$€]?\s?[\d.,]+)',
@@ -317,6 +382,8 @@ def smart_process(image_path):
 
     parsed = parse_info(results, scanned.shape[0])
 
+    avg_conf = round(sum(r[2] for r in results) / len(results) * 100, 1) if results else 0
+
     return {
         "images": {
             "original": f"/static/uploads/{filename}",
@@ -326,6 +393,8 @@ def smart_process(image_path):
         },
         "text": full_text,
         "parsed_info": parsed,
+        "ocr_confidence": avg_conf,
+        "ocr_blocks": len(results),
     }
 
 
