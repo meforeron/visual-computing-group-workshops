@@ -1,0 +1,539 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Dashboard de SmartInvoice — visualiza gastos y estadísticas de tus facturas.">
+    <title>Dashboard — SmartInvoice</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        .stat-card {
+            background: var(--card-bg);
+            border-radius: 20px;
+            padding: 1.75rem 2rem;
+            border: 1px solid var(--glass-border);
+            box-shadow: 0 15px 40px rgba(0,0,0,0.3);
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+        .stat-card::after {
+            content: '';
+            position: absolute;
+            bottom: -30px;
+            right: -20px;
+            width: 100px;
+            height: 100px;
+            border-radius: 50%;
+            opacity: 0.06;
+        }
+        .stat-card.card-invoices::after { background: var(--primary); }
+        .stat-card.card-cop::after      { background: #f59e0b; }
+        .stat-card.card-usd::after      { background: var(--accent); }
+        .stat-card:hover {
+            transform: translateY(-5px);
+            border-color: var(--glass-border-bright);
+            box-shadow: 0 20px 50px rgba(0,0,0,0.4);
+        }
+        .stat-icon {
+            width: 48px;
+            height: 48px;
+            border-radius: 14px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.3rem;
+            flex-shrink: 0;
+        }
+        .stat-icon.icon-invoices { background: rgba(99,102,241,0.15); color: #818cf8; }
+        .stat-icon.icon-cop      { background: rgba(245,158,11,0.15);  color: #fbbf24; }
+        .stat-icon.icon-usd      { background: rgba(34,197,94,0.15);   color: #4ade80; }
+        .stat-amount {
+            font-family: 'Outfit', sans-serif;
+            font-size: 2rem;
+            font-weight: 700;
+            line-height: 1.2;
+            margin: 0.25rem 0;
+        }
+        .chart-container {
+            background: var(--card-bg);
+            border-radius: 20px;
+            padding: 1.5rem;
+            border: 1px solid var(--glass-border);
+            box-shadow: 0 15px 30px rgba(0,0,0,0.3);
+            margin-bottom: 2rem;
+        }
+        .table-container {
+            background: var(--card-bg);
+            border-radius: 20px;
+            padding: 2rem;
+            border: 1px solid var(--glass-border);
+            box-shadow: 0 15px 30px rgba(0,0,0,0.3);
+        }
+        .table { color: var(--text-main) !important; margin-bottom: 0; }
+        .table-striped>tbody>tr:nth-of-type(odd)>* {
+            color: var(--text-main) !important;
+            background-color: rgba(255,255,255,0.02) !important;
+        }
+        .table-striped>tbody>tr:hover>* {
+            background-color: rgba(99,102,241,0.1) !important;
+        }
+        .table th {
+            color: var(--text-muted);
+            border-bottom: 1px solid var(--glass-border) !important;
+            font-weight: 600;
+            text-transform: uppercase;
+            font-size: 0.78rem;
+            letter-spacing: 0.04em;
+        }
+        .table td { border-bottom: 1px solid var(--glass-border) !important; vertical-align: middle; }
+        .badge-currency {
+            padding: 0.22rem 0.55rem;
+            border-radius: 8px;
+            font-size: 0.75rem;
+            font-weight: 700;
+        }
+        .badge-cop { background: rgba(245,158,11,0.18); color: #fbbf24; border: 1px solid rgba(245,158,11,0.35); }
+        .badge-usd { background: rgba(34,197,94,0.18);  color: #4ade80; border: 1px solid rgba(34,197,94,0.35); }
+        .badge-other{ background: rgba(99,102,241,0.18);color: #a5b4fc; border: 1px solid rgba(99,102,241,0.35); }
+        .btn-view {
+            background: rgba(99,102,241,0.15);
+            color: #a5b4fc;
+            border: 1px solid rgba(99,102,241,0.3);
+            padding: 0.3rem 0.7rem;
+            border-radius: 8px;
+            text-decoration: none;
+            font-size: 0.82rem;
+            transition: all 0.2s ease;
+        }
+        .btn-view:hover { background: var(--primary); color: white; }
+        .divider-currency {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            margin: 0.5rem 0 0;
+        }
+        .divider-currency span {
+            font-size: 0.75rem;
+            color: var(--text-dim);
+            white-space: nowrap;
+        }
+        .divider-currency hr {
+            flex: 1;
+            border-color: var(--glass-border);
+            margin: 0;
+        }
+    </style>
+</head>
+<body>
+<nav class="navbar navbar-expand-lg navbar-dark">
+    <div class="container">
+        <a class="navbar-brand" href="{{ url_for('index') }}">
+            <i class="fas fa-file-invoice-dollar me-2" style="background:linear-gradient(135deg,var(--primary),#a78bfa);-webkit-background-clip:text;-webkit-text-fill-color:transparent;"></i>
+            SmartInvoice
+        </a>
+        <button class="navbar-toggler border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+        <div class="collapse navbar-collapse" id="navbarNav">
+            <ul class="navbar-nav ms-auto gap-1">
+                <li class="nav-item"><a class="nav-link" href="{{ url_for('index') }}"><i class="fas fa-camera me-1"></i> Escanear</a></li>
+                <li class="nav-item"><a class="nav-link active" href="{{ url_for('dashboard') }}"><i class="fas fa-chart-pie me-1"></i> Dashboard</a></li>
+                <li class="nav-item"><a class="nav-link text-danger" href="{{ url_for('logout') }}"><i class="fas fa-sign-out-alt me-1"></i> Salir ({{ current_user.username }})</a></li>
+            </ul>
+        </div>
+    </div>
+</nav>
+
+<div class="container mt-5">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h1 class="fw-bold" style="font-family: 'Outfit', sans-serif; background: linear-gradient(135deg, #fff 0%, #818cf8 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">Estadísticas del Negocio</h1>
+            <p class="text-muted mb-0">Analiza tus gastos y patrones a partir de las facturas procesadas.</p>
+        </div>
+        <div>
+            <a href="{{ url_for('index') }}" class="btn export-btn"><i class="fas fa-plus me-1"></i> Nueva Factura</a>
+        </div>
+    </div>
+
+    {% if deleted_count > 0 %}
+    <div id="cleanup-banner" style="
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        padding: 0.85rem 1.25rem;
+        margin-bottom: 1.5rem;
+        background: rgba(248,113,113,0.08);
+        border: 1px solid rgba(248,113,113,0.25);
+        border-radius: 12px;
+        font-size: 0.88rem;
+        color: #fca5a5;
+    ">
+        <i class="fas fa-trash-alt" style="font-size:1.1rem; flex-shrink:0;"></i>
+        <span>
+            Se eliminaron <strong>{{ deleted_count }}</strong>
+            {{ 'factura' if deleted_count == 1 else 'facturas' }}
+            con total <strong>$0 o no detectado</strong> de tu historial.
+        </span>
+        <button onclick="document.getElementById('cleanup-banner').remove()"
+                style="margin-left:auto;background:none;border:none;color:#f87171;cursor:pointer;font-size:1rem;padding:0;"
+                title="Cerrar">
+            <i class="fas fa-times"></i>
+        </button>
+    </div>
+    {% endif %}
+
+
+    <!-- Stats Row -->
+    <div class="row g-4 mb-5">
+
+        <!-- Total facturas -->
+        <div class="col-md-4">
+            <div class="stat-card card-invoices">
+                <div class="d-flex justify-content-between align-items-start mb-3">
+                    <div>
+                        <p class="text-muted mb-1" style="font-size:0.82rem;text-transform:uppercase;letter-spacing:0.05em;">Total Facturas</p>
+                        <div class="stat-amount text-white">{{ total_count }}</div>
+                        <small class="text-success"><i class="fas fa-check-circle me-1"></i>Documentos registrados</small>
+                    </div>
+                    <div class="stat-icon icon-invoices"><i class="fas fa-file-invoice"></i></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- COP total -->
+        <div class="col-md-4">
+            <div class="stat-card card-cop">
+                <div class="d-flex justify-content-between align-items-start mb-3">
+                    <div style="min-width:0;flex:1;">
+                        <p class="mb-1" style="font-size:0.82rem;text-transform:uppercase;letter-spacing:0.05em;color:#fbbf24;">Gastos en COP</p>
+                        <div class="stat-amount" style="color:#fbbf24;">
+                            {% if total_cop > 0 %}
+                                ${{ "{:,.0f}".format(total_cop) }}
+                            {% else %}
+                                <span style="color:var(--text-dim);font-size:1.2rem;">Sin datos</span>
+                            {% endif %}
+                        </div>
+                        <small style="color:var(--text-muted);">Pesos colombianos acumulados</small>
+                    </div>
+                    <div class="stat-icon icon-cop" style="flex-shrink:0;"><i class="fas fa-peso-sign"></i></div>
+                </div>
+                {% if total_cop > 0 and total_count > 0 %}
+                <div class="divider-currency">
+                    <hr><span>Promedio por factura</span><hr>
+                </div>
+                <p style="font-size:0.9rem;color:#fbbf24;font-weight:600;margin:0;">
+                    ${{ "{:,.0f}".format(total_cop / total_count) }} COP
+                </p>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- USD total -->
+        <div class="col-md-4">
+            <div class="stat-card card-usd">
+                <div class="d-flex justify-content-between align-items-start mb-3">
+                    <div style="min-width:0;flex:1;">
+                        <p class="mb-1" style="font-size:0.82rem;text-transform:uppercase;letter-spacing:0.05em;color:#4ade80;">Gastos en USD</p>
+                        <div class="stat-amount" style="color:#4ade80;">
+                            {% if total_usd > 0 %}
+                                ${{ "{:,.2f}".format(total_usd) }}
+                            {% else %}
+                                <span style="color:var(--text-dim);font-size:1.2rem;">Sin datos</span>
+                            {% endif %}
+                        </div>
+                        <small style="color:var(--text-muted);">Dólares acumulados</small>
+                    </div>
+                    <div class="stat-icon icon-usd" style="flex-shrink:0;"><i class="fas fa-dollar-sign"></i></div>
+                </div>
+                {% if total_usd > 0 and total_count > 0 %}
+                <div class="divider-currency">
+                    <hr><span>Promedio por factura</span><hr>
+                </div>
+                <p style="font-size:0.9rem;color:#4ade80;font-weight:600;margin:0;">
+                    ${{ "{:,.2f}".format(total_usd / total_count) }} USD
+                </p>
+                {% endif %}
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Charts Row -->
+    <div class="row g-4 mb-5">
+
+        <!-- Total Impuestos (Donut) -->
+        <div class="col-md-5">
+            <div class="chart-container" style="height:100%;">
+                <h5 class="mb-1 text-muted"><i class="fas fa-percent me-2"></i>Total Impuestos Acumulados</h5>
+                <p style="font-size:0.78rem;color:var(--text-dim);margin-bottom:1rem;">IVA / Tax detectado por moneda</p>
+                <div style="height:260px;position:relative;display:flex;align-items:center;justify-content:center;">
+                    <canvas id="taxChart"></canvas>
+                    <div id="taxEmpty" style="display:none;text-align:center;color:var(--text-dim);">
+                        <i class="fas fa-receipt" style="font-size:2rem;margin-bottom:0.5rem;display:block;"></i>
+                        Sin impuestos detectados
+                    </div>
+                </div>
+                <!-- Tax summary pills -->
+                <div id="taxPills" class="d-flex gap-2 flex-wrap mt-3" style="font-size:0.8rem;"></div>
+            </div>
+        </div>
+
+        <!-- Gastos Mensuales (Bar) -->
+        <div class="col-md-7">
+            <div class="chart-container">
+                <h5 class="mb-1 text-muted"><i class="fas fa-calendar-alt me-2"></i>Gastos Mensuales</h5>
+                <p style="font-size:0.78rem;color:var(--text-dim);margin-bottom:1rem;">Solo facturas con fecha detectada</p>
+                <div style="height:260px;position:relative;">
+                    <canvas id="monthlyChart"></canvas>
+                    <div id="monthlyEmpty" style="display:none;position:absolute;inset:0;display:none;align-items:center;justify-content:center;text-align:center;color:var(--text-dim);">
+                        <div>
+                            <i class="fas fa-calendar-times" style="font-size:2rem;margin-bottom:0.5rem;display:block;"></i>
+                            No hay facturas con fecha válida
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Table Section -->
+    <div class="table-container mb-5">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h4 class="text-muted mb-0"><i class="fas fa-list me-2"></i>Detalle de Transacciones</h4>
+            {% if total_other > 0 %}
+            <span style="font-size:0.8rem;color:var(--text-dim);">
+                <i class="fas fa-info-circle me-1"></i>Otras monedas: ${{ total_other }}
+            </span>
+            {% endif %}
+        </div>
+        <div class="table-responsive">
+            <table class="table table-striped">
+                <thead>
+                    <tr>
+                        <th>Fecha</th>
+                        <th>Comercio</th>
+                        <th>Impuestos</th>
+                        <th>Moneda</th>
+                        <th>Total</th>
+                        <th class="text-end">Acciones</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for inv in invoices %}
+                    <tr>
+                        <td class="fw-semibold">{{ inv.date }}</td>
+                        <td>
+                            <i class="fas fa-store me-2 text-muted"></i>
+                            <strong>{{ inv.commerce }}</strong>
+                        </td>
+                        <td>{{ inv.tax if inv.tax and inv.tax != '---' else '—' }}</td>
+                        <td>
+                            {% set cur = (inv.currency or '').upper() %}
+                            <span class="badge-currency {% if cur == 'COP' %}badge-cop{% elif cur == 'USD' %}badge-usd{% else %}badge-other{% endif %}">
+                                {{ cur or '?' }}
+                            </span>
+                        </td>
+                        <td class="fw-bold">
+                            {% if (inv.currency or '').upper() == 'COP' %}
+                                <span style="color:#fbbf24;">${{ inv.total }}</span>
+                            {% elif (inv.currency or '').upper() == 'USD' %}
+                                <span style="color:#4ade80;">${{ inv.total }}</span>
+                            {% else %}
+                                <span style="color:var(--accent);">${{ inv.total }}</span>
+                            {% endif %}
+                        </td>
+                        <td class="text-end">
+                            {% if inv.image_path %}
+                                <a href="{{ inv.image_path }}" target="_blank" class="btn-view">
+                                    <i class="fas fa-eye me-1"></i> Ver
+                                </a>
+                            {% else %}
+                                <span class="text-muted" style="font-size:0.8rem;">Sin imagen</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr><td colspan="6" class="text-center py-5" style="color:var(--text-dim);">No hay facturas registradas. ¡Comienza a escanear!</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<script>
+    const invoices = {{ invoices_json | safe }};
+
+    Chart.defaults.color = '#94a3b8';
+    Chart.defaults.borderColor = 'rgba(255,255,255,0.07)';
+
+    /* ── helpers ──────────────────────────────────────────────────── */
+    function parseNum(s) {
+        try { return parseFloat((s || '').replace(/[^\d.]/g, '')) || 0; }
+        catch(e) { return 0; }
+    }
+
+    /* ── 1. Tax Donut ─────────────────────────────────────────────── */
+    const taxByCurrency = {};
+    invoices.forEach(inv => {
+        const taxVal = parseNum(inv.tax);
+        if (taxVal <= 0) return;
+        const cur = (inv.currency || 'Otro').toUpperCase();
+        taxByCurrency[cur] = (taxByCurrency[cur] || 0) + taxVal;
+    });
+
+    const taxLabels = Object.keys(taxByCurrency);
+    const taxData   = Object.values(taxByCurrency);
+
+    const DONUT_COLORS = {
+        COP: { bg: 'rgba(245,158,11,0.75)',  border: '#f59e0b' },
+        USD: { bg: 'rgba(34,197,94,0.75)',   border: '#22c55e' },
+        EUR: { bg: 'rgba(99,102,241,0.75)', border: '#6366f1' },
+    };
+    function donutColor(label, prop) {
+        return (DONUT_COLORS[label] || { bg:'rgba(148,163,184,0.6)', border:'#94a3b8' })[prop];
+    }
+
+    if (taxLabels.length > 0) {
+        const ctxTax = document.getElementById('taxChart').getContext('2d');
+        new Chart(ctxTax, {
+            type: 'doughnut',
+            data: {
+                labels: taxLabels,
+                datasets: [{
+                    data: taxData,
+                    backgroundColor: taxLabels.map(l => donutColor(l, 'bg')),
+                    borderColor:     taxLabels.map(l => donutColor(l, 'border')),
+                    borderWidth: 2,
+                    hoverOffset: 10,
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                cutout: '68%',
+                plugins: {
+                    legend: {
+                        position: 'right',
+                        labels: { padding: 14, font: { size: 12 }, boxWidth: 14, borderRadius: 4 }
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: ctx => ` ${ctx.label}: ${ctx.formattedValue}`
+                        }
+                    }
+                }
+            }
+        });
+
+        // Pills summary
+        const pillsEl = document.getElementById('taxPills');
+        taxLabels.forEach((label, i) => {
+            const pill = document.createElement('span');
+            pill.style.cssText = `padding:0.2rem 0.6rem;border-radius:999px;background:${donutColor(label,'bg')};
+                color:#fff;font-weight:600;font-size:0.75rem;`;
+            pill.textContent = `${label}: ${taxData[i].toLocaleString('es-CO', {maximumFractionDigits:2})}`;
+            pillsEl.appendChild(pill);
+        });
+    } else {
+        document.getElementById('taxChart').style.display = 'none';
+        document.getElementById('taxEmpty').style.display = 'block';
+    }
+
+    /* ── 2. Monthly Spending Bar ──────────────────────────────────── */
+    // Regex patterns to extract a parseable date from various formats
+    // Accepted: DD/MM/YYYY, DD-MM-YYYY, YYYY/MM/DD, "12 de marzo de 2024"
+    const MONTH_NAMES_ES = {
+        enero:1,febrero:2,marzo:3,abril:4,mayo:5,junio:6,
+        julio:7,agosto:8,septiembre:9,octubre:10,noviembre:11,diciembre:12
+    };
+
+    function parseInvoiceDate(dateStr) {
+        if (!dateStr || dateStr === '---' || dateStr === 'Sin fecha') return null;
+        // DD/MM/YYYY or DD-MM-YYYY
+        let m = dateStr.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})$/);
+        if (m) {
+            const [, dd, mm, yy] = m;
+            const year = yy.length === 2 ? 2000 + parseInt(yy) : parseInt(yy);
+            return { year, month: parseInt(mm) };
+        }
+        // YYYY/MM/DD or YYYY-MM-DD
+        m = dateStr.match(/^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})$/);
+        if (m) {
+            return { year: parseInt(m[1]), month: parseInt(m[2]) };
+        }
+        // "12 de marzo de 2024"
+        m = dateStr.match(/\d{1,2}\s+de\s+(\w+)\s+de\s+(\d{4})/i);
+        if (m) {
+            const monthNum = MONTH_NAMES_ES[m[1].toLowerCase()];
+            if (monthNum) return { year: parseInt(m[2]), month: monthNum };
+        }
+        return null;
+    }
+
+    const MONTH_LABELS = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+
+    const monthlyTotals = {}; // key: "YYYY-MM" → { label, total, cop, usd }
+    invoices.forEach(inv => {
+        const parsed = parseInvoiceDate(inv.date);
+        if (!parsed) return;
+        const key   = `${parsed.year}-${String(parsed.month).padStart(2,'0')}`;
+        const label = `${MONTH_LABELS[parsed.month-1]} ${parsed.year}`;
+        const val   = parseNum(inv.total);
+        const cur   = (inv.currency || '').toUpperCase();
+        if (!monthlyTotals[key]) monthlyTotals[key] = { label, cop: 0, usd: 0, other: 0 };
+        if (cur === 'COP') monthlyTotals[key].cop   += val;
+        else if (cur === 'USD') monthlyTotals[key].usd += val;
+        else monthlyTotals[key].other += val;
+    });
+
+    const sortedMonths = Object.keys(monthlyTotals).sort();
+
+    if (sortedMonths.length > 0) {
+        document.getElementById('monthlyEmpty').style.display = 'none';
+        const mLabels   = sortedMonths.map(k => monthlyTotals[k].label);
+        const mCOP      = sortedMonths.map(k => monthlyTotals[k].cop);
+        const mUSD      = sortedMonths.map(k => monthlyTotals[k].usd);
+        const mOther    = sortedMonths.map(k => monthlyTotals[k].other);
+
+        const hasCOP    = mCOP.some(v => v > 0);
+        const hasUSD    = mUSD.some(v => v > 0);
+        const hasOther  = mOther.some(v => v > 0);
+
+        const datasets = [];
+        if (hasCOP)   datasets.push({ label:'COP', data:mCOP,   backgroundColor:'rgba(245,158,11,0.7)', borderColor:'#f59e0b', borderWidth:2, borderRadius:6 });
+        if (hasUSD)   datasets.push({ label:'USD', data:mUSD,   backgroundColor:'rgba(34,197,94,0.7)',  borderColor:'#22c55e', borderWidth:2, borderRadius:6 });
+        if (hasOther) datasets.push({ label:'Otro',data:mOther, backgroundColor:'rgba(99,102,241,0.7)',borderColor:'#6366f1', borderWidth:2, borderRadius:6 });
+
+        const ctxMonthly = document.getElementById('monthlyChart').getContext('2d');
+        new Chart(ctxMonthly, {
+            type: 'bar',
+            data: { labels: mLabels, datasets },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: datasets.length > 1 }
+                },
+                scales: {
+                    x: { stacked: false },
+                    y: { beginAtZero: true, stacked: false }
+                }
+            }
+        });
+    } else {
+        document.getElementById('monthlyChart').style.display = 'none';
+        const emptyEl = document.getElementById('monthlyEmpty');
+        emptyEl.style.display = 'flex';
+    }
+</script>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
+

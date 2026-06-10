@@ -6,8 +6,12 @@ import re
 import sys
 import uuid
 import time
-from flask import Flask, render_template, request, jsonify
+import json
+from flask import Flask, render_template, request, jsonify, redirect, url_for, flash
 from werkzeug.utils import secure_filename
+from flask_login import LoginManager, login_user, logout_user, login_required, current_user
+from flask_bcrypt import Bcrypt
+from models import db, User, Invoice
 
 USE_GPU = os.environ.get("USE_GPU", "0") == "1"
 reader = easyocr.Reader(['es', 'en'], gpu=USE_GPU, verbose=False)
@@ -29,7 +33,23 @@ _MERCHANT_NOISE = [
 ]
 
 app = Flask(__name__)
+app.config['SECRET_KEY'] = 'super-secret-key-smartinvoice'
 app.config['UPLOAD_FOLDER'] = os.path.join('static', 'uploads')
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///database.db'
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+
+db.init_app(app)
+bcrypt = Bcrypt(app)
+login_manager = LoginManager(app)
+login_manager.login_view = 'login'
+
+@login_manager.user_loader
+def load_user(user_id):
+    return User.query.get(int(user_id))
+
+with app.app_context():
+    db.create_all()
+
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 
 
@@ -160,14 +180,18 @@ def four_point_transform(image, pts):
 # ---------------------------------------------------------------------------
 
 def extract_merchant(results, img_height):
-    """Return merchant name from topmost OCR blocks (top 15% of image)."""
+    """Return merchant name from topmost OCR blocks (top 25% of image).
+    Blocks are sorted by Y then filtered by confidence (>= 0.4).
+    Prefers high-confidence blocks at the very top.
+    """
+    # Sort by top-Y ascending (topmost first)
     sorted_by_y = sorted(results, key=lambda r: min(pt[1] for pt in r[0]))
     lines = []
     for bbox, text, prob in sorted_by_y:
         top_y = min(pt[1] for pt in bbox)
-        if top_y > img_height * 0.18:
+        if top_y > img_height * 0.25:
             break
-        if prob < 0.3 or len(text.strip()) < 2:
+        if prob < 0.4 or len(text.strip()) < 2:
             continue
         if any(re.search(p, text, re.IGNORECASE) for p in _MERCHANT_NOISE):
             continue
@@ -249,13 +273,13 @@ def extract_date(text):
 
 def extract_currency(text):
     checks = [
-        (r'\$', '$'),
         (r'\bCOP\b', 'COP'),
         (r'€|\bEUR\b', 'EUR'),
         (r'\bUSD\b', 'USD'),
         (r'\bPEN\b', 'PEN'),
         (r'\bMXN\b', 'MXN'),
         (r'\bBs\b', 'Bs'),
+        (r'\$', '$'),
     ]
     for pattern, label in checks:
         if re.search(pattern, text, re.IGNORECASE):
@@ -269,15 +293,25 @@ def extract_tax(text):
         r'\bSALES\s+TAX[\s\:$]+([\$€]?\s?[\d.,]+)',
         r'\bTAX\s+AMOUNT[\s\:$]+([\$€]?\s?[\d.,]+)',
         r'\bTAX[\s\:$]+([\$€]?\s?[\d.,]+)',
-        r'\bIVA\s*(?:\([^)]*\))?\s*[\:\s]+([\$€]?\s?[\d.,]+)',  # IVA (19%): $ X
-        r'\bI\.V\.A\.[\s\:$]+([\$€]?\s?[\d.,]+)',
+        # IVA with inline percentage: "IVA 19% $1.234" or "IVA (19%): 1.234"
+        r'\bIVA\s*(?:\d{1,3}\s*%)?\s*(?:\([^)]*\))?\s*[:\s$]+([\$€]?\s?[\d.,]+)',
+        r'\bI\.V\.A\.\s*(?:\([^)]*\))?\s*[\:\s$]+([\$€]?\s?[\d.,]+)',
+        r'\bIMPUESTO\s+AL\s+CONSUMO[\s\:$]+([\$€]?\s?[\d.,]+)',
         r'\bIMPUESTO[\s\:$]+([\$€]?\s?[\d.,]+)',
         r'\bTRIBUTO[\s\:$]+([\$€]?\s?[\d.,]+)',
+        # Percentage-style on its own line: "19%  1.234"
+        r'\b\d{1,2}%\s+([\d.,]{3,})',
     ]
     for p in patterns:
         m = re.search(p, text, re.IGNORECASE)
         if m:
-            return normalize_price(m.group(1))
+            raw = m.group(1)
+            normalized = normalize_price(raw)
+            try:
+                float(normalized)
+                return normalized
+            except ValueError:
+                return raw.strip()
     return "---"
 
 
@@ -286,7 +320,7 @@ def extract_total(text):
     Strips SUB TOTAL / SUBTOTAL before searching to prevent false matches."""
     # Remove subtotal lines first (handles "SUB TOTAL", "Sub  Total", "SUBTOTAL")
     clean = re.sub(r'\bSUB[\s\-]*TOTAL\b', '_SUBTOTAL_', text, flags=re.IGNORECASE)
-    # Capture group allows optional space-decimal ("69 25" → 69.25)
+    # Price pattern: optional currency symbol, digits, separators, optional space-decimal
     _price = r'([\$€]?\s?[\d.,]+(?:\s\d{2})?)'
     patterns = [
         rf'\bGRAND\s+TOTAL[\s\:$]+{_price}',
@@ -295,38 +329,79 @@ def extract_total(text):
         rf'\bTOTAL\s+AMOUNT[\s\:$]+{_price}',
         rf'\bAMOUNT\s+DUE[\s\:$]+{_price}',
         rf'\bIMPORTE\s+TOTAL[\s\:$]+{_price}',
+        # Handle "TOTAL $ 1.234.567" — currency symbol on label line
+        rf'\bTOTAL\s+\$\s*({_price})',
         rf'\bTOTAL[\s\:$]+{_price}',
         rf'\bIMPORTE[\s\:$]+{_price}',
+        rf'\bVALOR\s+TOTAL[\s\:$]+{_price}',
+        rf'\bNET\s+AMOUNT[\s\:$]+{_price}',
+        rf'\bBALANCE\s+DUE[\s\:$]+{_price}',
     ]
     for p in patterns:
         m = re.search(p, clean, re.IGNORECASE)
         if m:
-            raw = m.group(1)
+            # Last group captures the number (handle nested group from TOTAL $)
+            raw = m.group(m.lastindex)
             normalized = normalize_price(raw)
             if re.match(r'^\d+\.\d{2}$', normalized):
                 return normalized
             return raw.strip()
 
-    # Fallback: largest price-like number in text
-    prices = re.findall(r'\b\d+[.,]\d{2}\b', clean)
-    if prices:
+    # Fallback 1: find the first number after the last occurrence of "total"
+    total_idx = clean.lower().rfind('total')
+    if total_idx != -1:
+        after_total = clean[total_idx:]
+        prices = re.findall(r'[\d.,]+', after_total)
+        for p in prices:
+            normalized = normalize_price(p)
+            try:
+                val = float(normalized)
+                if val > 0:
+                    return normalized
+            except ValueError:
+                continue
+
+    # Fallback 2: return the largest number in the text (common in simple receipts)
+    all_numbers = re.findall(r'\b[\d]{1,3}(?:[.,]\d{3})*(?:[.,]\d{2})?\b', clean)
+    best = None
+    best_val = 0.0
+    for n in all_numbers:
         try:
-            normalized = [normalize_price(p) for p in prices]
-            floats = [float(n) for n in normalized]
-            return normalized[floats.index(max(floats))]
-        except Exception:
-            pass
-    return "---"
+            val = float(normalize_price(n))
+            if val > best_val:
+                best_val = val
+                best = normalize_price(n)
+        except ValueError:
+            continue
+    return best if best else "---"
 
 
 def parse_info(results, img_height):
     full_text = " ".join(r[1] for r in results)
+    total = extract_total(full_text)
+    currency = extract_currency(full_text)
+    
+    # Disambiguate currency based on total value size
+    if currency in ['$', 'No detectada']:
+        try:
+            clean_total = float(re.sub(r'[^\d.]', '', total))
+            if clean_total >= 1000:
+                currency = 'COP'
+            else:
+                currency = 'USD'
+        except Exception:
+            # Fallback based on text clues if total is not numeric
+            if any(w in full_text.lower() for w in ['nit', 'iva', 'pesos', 'colombia', 'exito', 'carulla', 'ara', 'd1']):
+                currency = 'COP'
+            else:
+                currency = 'USD'
+                
     return {
         "Comercio": extract_merchant(results, img_height),
         "Fecha": extract_date(full_text),
-        "Moneda": extract_currency(full_text),
+        "Moneda": currency,
         "Impuestos": extract_tax(full_text),
-        "Total": extract_total(full_text),
+        "Total": total,
     }
 
 
@@ -334,67 +409,131 @@ def parse_info(results, img_height):
 # Main pipeline
 # ---------------------------------------------------------------------------
 
+def _enhance_for_ocr(gray):
+    """Apply CLAHE + unsharp masking to maximise contrast for EasyOCR."""
+    # CLAHE: adaptive histogram equalization
+    clahe = cv2.createCLAHE(clipLimit=2.5, tileGridSize=(8, 8))
+    enhanced = clahe.apply(gray)
+    # Unsharp masking (sharpening)
+    blur = cv2.GaussianBlur(enhanced, (0, 0), 3)
+    sharpened = cv2.addWeighted(enhanced, 1.5, blur, -0.5, 0)
+    return sharpened
+
+
+def _find_receipt_contour(image):
+    """Try multiple Canny thresholds + dilation to find a 4-point document contour.
+    Returns (screenCnt, edged_image, ratio) or (None, edged_image, ratio)."""
+    # Work on a smaller copy for speed; keep ratio to map back to original
+    h = image.shape[0]
+    ratio = h / 800.0 if h > 800 else 1.0
+    small = cv2.resize(image, (int(image.shape[1] / ratio), int(h / ratio)))
+    small_area = small.shape[0] * small.shape[1]
+
+    gray_s = cv2.cvtColor(small, cv2.COLOR_BGR2GRAY)
+    blur_s = cv2.GaussianBlur(gray_s, (5, 5), 0)
+
+    # Try three threshold pairs from coarse to fine
+    canny_params = [(50, 150), (75, 200), (30, 100)]
+    best_cnt = None
+    best_edged = None
+
+    for lo, hi in canny_params:
+        edged = cv2.Canny(blur_s, lo, hi)
+        # Dilate to close small edge gaps
+        kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (3, 3))
+        edged_d = cv2.dilate(edged, kernel, iterations=1)
+
+        cnts, _ = cv2.findContours(edged_d, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
+        cnts = sorted(cnts, key=cv2.contourArea, reverse=True)[:8]
+
+        for c in cnts:
+            peri = cv2.arcLength(c, True)
+            approx = cv2.approxPolyDP(c, 0.02 * peri, True)
+            if len(approx) == 4:
+                area = cv2.contourArea(approx)
+                # Must cover at least 15% of small image area (reject tiny rectangles)
+                if area >= small_area * 0.15:
+                    best_cnt = approx
+                    best_edged = edged
+                    break
+        if best_cnt is not None:
+            break
+        if best_edged is None:
+            best_edged = edged  # Keep last Canny result for display
+
+    return best_cnt, best_edged, ratio
+
+
 def smart_process(image_path):
     image = cv2.imread(image_path)
     if image is None:
         return None
 
     image = fix_orientation(image, image_path)
-
     orig = image.copy()
-    ratio = image.shape[0] / 500.0
-    image = cv2.resize(image, (int(image.shape[1] / ratio), 500))
 
-    gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-    blur = cv2.GaussianBlur(gray, (5, 5), 0)
-    edged = cv2.Canny(blur, 75, 200)
+    filename  = os.path.basename(image_path)
+    base_name, ext = os.path.splitext(filename)
+    upload_dir = app.config['UPLOAD_FOLDER']
 
-    cnts, _ = cv2.findContours(edged.copy(), cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
-    cnts = sorted(cnts, key=cv2.contourArea, reverse=True)[:5]
+    # ── 1. Perspective correction ──────────────────────────────────────────
+    screenCnt, edged, ratio = _find_receipt_contour(image)
 
-    screenCnt = None
-    for c in cnts:
-        peri = cv2.arcLength(c, True)
-        approx = cv2.approxPolyDP(c, 0.02 * peri, True)
-        if len(approx) == 4:
-            screenCnt = approx
-            break
-
-    scanned = orig
     if screenCnt is not None:
         scanned = four_point_transform(orig, screenCnt.reshape(4, 2) * ratio)
+    else:
+        scanned = orig  # No reliable contour found — use original
 
-    filename = os.path.basename(image_path)
-    base_name, ext = os.path.splitext(filename)
+    # Save edge image (upscale edged back if needed)
+    edge_display = cv2.resize(edged, (scanned.shape[1], scanned.shape[0])) if edged is not None else edged
+    cv2.imwrite(os.path.join(upload_dir, f"{base_name}_edge{ext}"), edged if edged is not None else np.zeros((100, 100), dtype=np.uint8))
+    cv2.imwrite(os.path.join(upload_dir, f"{base_name}_scan{ext}"), scanned)
 
-    cv2.imwrite(os.path.join(app.config['UPLOAD_FOLDER'], f"{base_name}_scan{ext}"), scanned)
-    cv2.imwrite(os.path.join(app.config['UPLOAD_FOLDER'], f"{base_name}_edge{ext}"), edged)
+    # ── 2. Preprocess for OCR (full resolution) ────────────────────────────
+    gray_ocr = cv2.cvtColor(scanned, cv2.COLOR_BGR2GRAY)
+    enhanced  = _enhance_for_ocr(gray_ocr)
+    # Convert back to BGR so EasyOCR receives a consistent 3-channel image
+    ocr_input = cv2.cvtColor(enhanced, cv2.COLOR_GRAY2BGR)
 
-    results = reader.readtext(scanned)
+    # ── 3. OCR ─────────────────────────────────────────────────────────────
+    results = reader.readtext(ocr_input)
+
+    # If confidence is low, try the raw scanned image as a fallback
+    if results:
+        avg = sum(r[2] for r in results) / len(results)
+        if avg < 0.45:
+            results_raw = reader.readtext(scanned)
+            if results_raw:
+                avg_raw = sum(r[2] for r in results_raw) / len(results_raw)
+                if avg_raw > avg:
+                    results = results_raw
+
     full_text = " ".join(r[1] for r in results)
 
+    # ── 4. Detection overlay ───────────────────────────────────────────────
     img_detection = scanned.copy()
     for (bbox, text, prob) in results:
         tl = (int(bbox[0][0]), int(bbox[0][1]))
         br = (int(bbox[2][0]), int(bbox[2][1]))
-        cv2.rectangle(img_detection, tl, br, (0, 255, 0), 2)
-    cv2.imwrite(os.path.join(app.config['UPLOAD_FOLDER'], f"{base_name}_detect{ext}"), img_detection)
+        color = (0, 255, 0) if prob >= 0.5 else (0, 165, 255)  # green / orange
+        cv2.rectangle(img_detection, tl, br, color, 2)
+    cv2.imwrite(os.path.join(upload_dir, f"{base_name}_detect{ext}"), img_detection)
 
-    parsed = parse_info(results, scanned.shape[0])
-
+    # ── 5. Parse & return ──────────────────────────────────────────────────
+    parsed   = parse_info(results, scanned.shape[0])
     avg_conf = round(sum(r[2] for r in results) / len(results) * 100, 1) if results else 0
 
     return {
         "images": {
-            "original": f"/static/uploads/{filename}",
-            "edge": f"/static/uploads/{base_name}_edge{ext}",
-            "scan": f"/static/uploads/{base_name}_scan{ext}",
+            "original":  f"/static/uploads/{filename}",
+            "edge":      f"/static/uploads/{base_name}_edge{ext}",
+            "scan":      f"/static/uploads/{base_name}_scan{ext}",
             "detection": f"/static/uploads/{base_name}_detect{ext}",
         },
-        "text": full_text,
-        "parsed_info": parsed,
+        "text":           full_text,
+        "parsed_info":    parsed,
         "ocr_confidence": avg_conf,
-        "ocr_blocks": len(results),
+        "ocr_blocks":     len(results),
     }
 
 
@@ -403,11 +542,113 @@ def smart_process(image_path):
 # ---------------------------------------------------------------------------
 
 @app.route('/')
+@login_required
 def index():
     return render_template('index.html')
 
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    if request.method == 'POST':
+        username = request.form.get('username')
+        password = request.form.get('password')
+        user = User.query.filter_by(username=username).first()
+        if user and bcrypt.check_password_hash(user.password_hash, password):
+            login_user(user)
+            return redirect(url_for('dashboard'))
+        else:
+            flash('Usuario o contraseña incorrectos.', 'error')
+    return render_template('login.html')
+
+@app.route('/register', methods=['GET', 'POST'])
+def register():
+    if request.method == 'POST':
+        username = request.form.get('username')
+        password = request.form.get('password')
+        if User.query.filter_by(username=username).first():
+            flash('El usuario ya existe.', 'error')
+        else:
+            hashed_pw = bcrypt.generate_password_hash(password).decode('utf-8')
+            new_user = User(username=username, password_hash=hashed_pw)
+            db.session.add(new_user)
+            db.session.commit()
+            flash('Cuenta creada exitosamente. Ahora puedes iniciar sesión.', 'success')
+            return redirect(url_for('login'))
+    return render_template('register.html')
+
+@app.route('/logout')
+@login_required
+def logout():
+    logout_user()
+    return redirect(url_for('login'))
+
+_COP_CURRENCIES  = {'cop', 'pesos', 'cop$'}
+_USD_CURRENCIES  = {'usd', 'dollar', 'dollars', 'us$'}
+
+
+def _parse_amount(total_str: str) -> float:
+    """Parse a normalized total string to float, return 0 on failure."""
+    try:
+        return float(re.sub(r'[^\d.]', '', total_str or ''))
+    except (ValueError, TypeError):
+        return 0.0
+
+
+@app.route('/dashboard')
+@login_required
+def dashboard():
+    all_invoices = Invoice.query.filter_by(user_id=current_user.id).order_by(Invoice.created_at.desc()).all()
+
+    # ── Auto-clean: remove invoices with a zero or undetected total ──────────
+    deleted = 0
+    for inv in all_invoices:
+        total_val = _parse_amount(inv.total)
+        is_blank  = not inv.total or inv.total.strip() in ('', '---', '0', '0.00')
+        if total_val == 0.0 or is_blank:
+            db.session.delete(inv)
+            deleted += 1
+    if deleted:
+        db.session.commit()
+
+    # Reload after cleanup
+    invoices = Invoice.query.filter_by(user_id=current_user.id).order_by(Invoice.created_at.desc()).all()
+
+    invoices_list = [{
+        'commerce': inv.commerce or 'Desconocido',
+        'date':     inv.date     or 'Sin fecha',
+        'currency': inv.currency or 'COP',
+        'tax':      inv.tax      or '0.00',
+        'total':    inv.total    or '0.00',
+        'created_at': inv.created_at.strftime('%Y-%m-%d %H:%M:%S')
+    } for inv in invoices]
+
+    total_cop   = 0.0
+    total_usd   = 0.0
+    total_other = 0.0
+
+    for inv in invoices:
+        amount   = _parse_amount(inv.total)
+        currency = (inv.currency or '').strip().lower()
+        if currency in _COP_CURRENCIES:
+            total_cop   += amount
+        elif currency in _USD_CURRENCIES:
+            total_usd   += amount
+        else:
+            total_other += amount
+
+    return render_template(
+        'dashboard.html',
+        invoices=invoices,
+        invoices_json=json.dumps(invoices_list),
+        total_count=len(invoices),
+        total_cop=round(total_cop, 2),
+        total_usd=round(total_usd, 2),
+        total_other=round(total_other, 2),
+        deleted_count=deleted,
+    )
+
 
 @app.route('/upload', methods=['POST'])
+@login_required
 def upload_file():
     if 'file' not in request.files:
         return jsonify({'error': 'No se envió ningún archivo.'}), 400
@@ -436,6 +677,20 @@ def upload_file():
         except OSError:
             pass
         return jsonify({'error': 'No se pudo leer la imagen. Verifica que no esté corrupta o en blanco.'}), 422
+
+    # Save to database
+    parsed = result.get('parsed_info', {})
+    new_invoice = Invoice(
+        user_id=current_user.id,
+        commerce=parsed.get('Comercio'),
+        date=parsed.get('Fecha'),
+        currency=parsed.get('Moneda'),
+        tax=parsed.get('Impuestos'),
+        total=parsed.get('Total'),
+        image_path=result['images']['scan']
+    )
+    db.session.add(new_invoice)
+    db.session.commit()
 
     return jsonify(result)
 
